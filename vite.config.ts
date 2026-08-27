@@ -8,8 +8,10 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'prompt',
+      injectRegister: 'auto',
       includeAssets: [],
       manifest: {
+        id: './',
         name: 'ClassPilot 班级座位助手',
         short_name: 'ClassPilot',
         description: '离线优先的班级座位管理工具',
@@ -17,9 +19,21 @@ export default defineConfig({
         background_color: '#f3f6fa',
         display: 'standalone',
         lang: 'zh-CN',
+        start_url: './',
+        scope: './',
+        icons: [
+          {
+            src: 'favicon.svg',
+            sizes: 'any',
+            type: 'image/svg+xml',
+            purpose: 'any maskable',
+          },
+        ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,woff2,png,ico}'],
+        cleanupOutdatedCaches: true,
+        globPatterns: ['**/*.{js,css,html,woff2,png,svg,ico,webmanifest}'],
+        navigateFallbackDenylist: [/^\/api\//],
       },
     }),
   ],

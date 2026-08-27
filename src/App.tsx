@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Archive,
   ChevronDown,
@@ -9,30 +9,34 @@ import {
   Sparkles,
   Users,
 } from 'lucide-react'
-import type { StudentRecord } from './domain/types'
+import { classRepository } from './data/repository'
+import { getStudentPool, placeStudent } from './domain/seating'
+import type {
+  ClassRecord,
+  ClassRepository,
+  LayoutDraft,
+  StudentRecord,
+} from './domain/types'
+import { createDefaultDraft } from './features/drafts/createDraft'
+import { DraftSession } from './features/drafts/draftSession'
+import { PwaUpdatePrompt } from './features/pwa/PwaUpdatePrompt'
 import './App.css'
 
-const students: StudentRecord[] = [
-  { id: 'student-01', classId: 'class-01', studentNo: '01', name: '林晓雨', gender: 'female', roles: ['语文课代表'], performanceLevel: 'excellent', rank: 3, characterTags: ['细心'], customTags: [], note: '', contact: {}, constraints: { frontPreference: 'none', avoidAdjacentStudentIds: [], preferredDeskMateStudentIds: [] }, archived: false, createdAt: '', updatedAt: '' },
-  { id: 'student-02', classId: 'class-01', studentNo: '02', name: '周宇航', gender: 'male', roles: ['班长'], performanceLevel: 'good', rank: 8, characterTags: ['活跃'], customTags: [], note: '', contact: {}, constraints: { frontPreference: 'none', avoidAdjacentStudentIds: [], preferredDeskMateStudentIds: [] }, archived: false, createdAt: '', updatedAt: '' },
-  { id: 'student-03', classId: 'class-01', studentNo: '03', name: '陈思远', gender: 'male', roles: [], performanceLevel: 'average', characterTags: ['安静'], customTags: [], note: '', contact: {}, constraints: { frontPreference: 'preferred', avoidAdjacentStudentIds: [], preferredDeskMateStudentIds: [] }, archived: false, createdAt: '', updatedAt: '' },
-  { id: 'student-04', classId: 'class-01', studentNo: '04', name: '苏可欣', gender: 'female', roles: [], performanceLevel: 'good', characterTags: ['耐心'], customTags: [], note: '', contact: {}, constraints: { frontPreference: 'none', avoidAdjacentStudentIds: [], preferredDeskMateStudentIds: [] }, archived: false, createdAt: '', updatedAt: '' },
-  { id: 'student-05', classId: 'class-01', studentNo: '05', name: '许嘉乐', gender: 'unspecified', roles: [], performanceLevel: 'needs_support', characterTags: [], customTags: [], note: '', contact: {}, constraints: { frontPreference: 'required', avoidAdjacentStudentIds: [], preferredDeskMateStudentIds: [] }, archived: false, createdAt: '', updatedAt: '' },
-  { id: 'student-06', classId: 'class-01', studentNo: '06', name: '沈安然', gender: 'female', roles: [], performanceLevel: 'excellent', characterTags: [], customTags: [], note: '', contact: {}, constraints: { frontPreference: 'none', avoidAdjacentStudentIds: [], preferredDeskMateStudentIds: [] }, archived: false, createdAt: '', updatedAt: '' },
-]
-
-const deskPairs = [
-  [students[0], students[1]],
-  [students[2], students[3]],
-  [students[4], students[5]],
-  [undefined, undefined],
-  [undefined, undefined],
-  [undefined, undefined],
-]
-
-function StudentSeat({ student }: { student?: StudentRecord }) {
+function StudentSeat({
+  student,
+  seatId,
+  onPlace,
+}: {
+  student?: StudentRecord
+  seatId: string
+  onPlace(seatId: string): void
+}) {
   if (!student) {
-    return <button className="seat seat-empty" aria-label="空座位"><Plus size={16} /></button>
+    return (
+      <button className="seat seat-empty" aria-label="空座位" onClick={() => onPlace(seatId)}>
+        <Plus size={16} />
+      </button>
+    )
   }
 
   return (
@@ -44,10 +48,131 @@ function StudentSeat({ student }: { student?: StudentRecord }) {
   )
 }
 
-function App() {
+function currentAcademicYear(): string {
+  const now = new Date()
+  const startYear = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1
+  return `${startYear}–${startYear + 1}`
+}
+
+function App({ repository = classRepository }: { repository?: ClassRepository }) {
   const [mode, setMode] = useState<'arrange' | 'layout'>('arrange')
-  const [selectedClass, setSelectedClass] = useState('初二（3）班')
-  const classes = useMemo(() => ['初二（3）班', '初一（5）班'], [])
+  const [classes, setClasses] = useState<ClassRecord[]>([])
+  const [selectedClassId, setSelectedClassId] = useState<string>()
+  const [students, setStudents] = useState<StudentRecord[]>([])
+  const [draft, setDraft] = useState<LayoutDraft>()
+  const [selectedStudentId, setSelectedStudentId] = useState<string>()
+  const [snapshotCount, setSnapshotCount] = useState(0)
+  const [status, setStatus] = useState('学生资料仅保存在此设备')
+  const sessionRef = useRef<DraftSession | undefined>(undefined)
+
+  useEffect(() => {
+    let active = true
+    repository
+      .listClasses()
+      .then((records) => {
+        if (!active) return
+        setClasses(records)
+        setSelectedClassId((current) =>
+          current && records.some(({ id }) => id === current) ? current : records[0]?.id,
+        )
+      })
+      .catch((error: unknown) => {
+        if (active) setStatus(error instanceof Error ? error.message : '无法读取本地班级')
+      })
+    return () => {
+      active = false
+    }
+  }, [repository])
+
+  useEffect(() => {
+    if (!selectedClassId) {
+      return
+    }
+
+    let active = true
+    let session: DraftSession | undefined
+    Promise.all([
+      repository.listStudents(selectedClassId),
+      repository.getDraft(selectedClassId),
+      repository.listSnapshots(selectedClassId),
+    ])
+      .then(async ([nextStudents, storedDraft, snapshots]) => {
+        const nextDraft = storedDraft ?? createDefaultDraft(selectedClassId)
+        if (!storedDraft) await repository.saveDraft(nextDraft)
+        if (!active) return
+        setStudents(nextStudents)
+        setSnapshotCount(snapshots.length)
+        session = new DraftSession(nextDraft, repository)
+        sessionRef.current = session
+        session.subscribe((history) => setDraft(structuredClone(history.present)))
+      })
+      .catch((error: unknown) => {
+        if (active) setStatus(error instanceof Error ? error.message : '无法读取本地座位草稿')
+      })
+
+    return () => {
+      active = false
+      if (session && sessionRef.current === session) sessionRef.current = undefined
+      void session?.dispose().catch((error: unknown) => {
+        setStatus(error instanceof Error ? error.message : '草稿自动保存失败')
+      })
+    }
+  }, [repository, selectedClassId])
+
+  const selectedClass = classes.find(({ id }) => id === selectedClassId)
+  const studentsById = useMemo(
+    () => new Map(students.map((student) => [student.id, student])),
+    [students],
+  )
+  const assignmentsBySeat = useMemo(
+    () => new Map(draft?.assignments.map((assignment) => [assignment.seatId, assignment.studentId]) ?? []),
+    [draft],
+  )
+  const studentPool = useMemo(
+    () => getStudentPool(students, draft?.assignments ?? []),
+    [draft, students],
+  )
+
+  async function createClass(): Promise<void> {
+    try {
+      const classroom = await repository.createClass({
+        name: `新班级 ${classes.length + 1}`,
+        grade: '',
+        academicYear: currentAcademicYear(),
+      })
+      setClasses((current) => [...current, classroom])
+      setSelectedClassId(classroom.id)
+      setStatus('班级已创建，可继续导入学生名单')
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : '新建班级失败')
+    }
+  }
+
+  function placeSelectedStudent(seatId: string): void {
+    const studentId = selectedStudentId ?? studentPool[0]?.id
+    if (!studentId || !sessionRef.current) return
+    sessionRef.current.update((current) => ({
+      ...current,
+      assignments: placeStudent(current.assignments, studentId, seatId),
+    }))
+    setSelectedStudentId(undefined)
+    setStatus('座位草稿将在本地自动保存')
+  }
+
+  async function publishSnapshot(): Promise<void> {
+    if (!selectedClassId || !draft) return
+    try {
+      await sessionRef.current?.flush()
+      await repository.publishSnapshot({
+        classId: selectedClassId,
+        title: `${new Date().toLocaleDateString('zh-CN')} 座位表`,
+      })
+      setSnapshotCount((count) => count + 1)
+      setStatus('当前座位表已保存为不可变历史版本')
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : '启用座位表失败')
+    }
+  }
 
   return (
     <main className="app-shell">
@@ -57,35 +182,39 @@ function App() {
           <div><strong>ClassPilot</strong><small>班级座位助手</small></div>
         </div>
 
-        <button className="new-class"><Plus size={17} /> 新建班级</button>
+        <button className="new-class" onClick={() => void createClass()}><Plus size={17} /> 新建班级</button>
         <p className="section-label">我的班级</p>
         <nav aria-label="班级列表">
-          {classes.map((className) => (
+          {classes.map((classroom) => (
             <button
-              key={className}
-              className={`class-item ${selectedClass === className ? 'active' : ''}`}
-              onClick={() => setSelectedClass(className)}
+              key={classroom.id}
+              className={`class-item ${selectedClassId === classroom.id ? 'active' : ''}`}
+              onClick={() => {
+                setSelectedClassId(classroom.id)
+                setSelectedStudentId(undefined)
+              }}
             >
-              <span><Users size={17} />{className}</span>
-              <small>{className === '初二（3）班' ? '42 名学生' : '39 名学生'}</small>
+              <span><Users size={17} />{classroom.name}</span>
+              <small>{selectedClassId === classroom.id ? `${students.length} 名学生` : classroom.academicYear || '本地班级'}</small>
             </button>
           ))}
+          {classes.length === 0 && <p className="empty-classes">尚无班级，请先新建班级</p>}
         </nav>
         <div className="sidebar-spacer" />
         <button className="sidebar-link"><Archive size={17} /> 已归档班级</button>
         <button className="sidebar-link"><Settings size={17} /> 设置与备份</button>
-        <div className="privacy-note"><span>本地离线</span><small>学生资料仅保存在此设备</small></div>
+        <div className="privacy-note"><span>本地离线</span><small>{status}</small></div>
       </aside>
 
       <section className="workspace">
         <header className="topbar">
           <div>
-            <button className="class-title">{selectedClass}<ChevronDown size={18} /></button>
-            <p>2026–2027 学年 · 座位草稿已自动保存</p>
+            <button className="class-title">{selectedClass?.name ?? '未选择班级'}<ChevronDown size={18} /></button>
+            <p>{selectedClass?.academicYear || '—'} 学年 · 座位草稿已自动保存</p>
           </div>
           <div className="toolbar">
-            <button className="secondary"><History size={17} /> 历史版本</button>
-            <button className="publish"><Sparkles size={17} /> 启用此座位表</button>
+            <button className="secondary" title={`共 ${snapshotCount} 个历史版本`}><History size={17} /> 历史版本</button>
+            <button className="publish" disabled={!draft} onClick={() => void publishSnapshot()}><Sparkles size={17} /> 启用此座位表</button>
           </div>
         </header>
 
@@ -94,20 +223,26 @@ function App() {
             <button className={mode === 'arrange' ? 'selected' : ''} onClick={() => setMode('arrange')}>安排学生</button>
             <button className={mode === 'layout' ? 'selected' : ''} onClick={() => setMode('layout')}>编辑教室</button>
           </div>
-          <span>{mode === 'arrange' ? '拖动学生即可换座或交换位置' : '拖动桌子并添加特殊座位'}</span>
+          <span>{mode === 'arrange' ? '选择待安排学生，再点击空座位' : '拖动桌子并添加特殊座位'}</span>
           <div className="zoom"><button>−</button><span>90%</span><button>＋</button></div>
         </div>
 
         <div className="canvas-wrap">
-          <section className="classroom" aria-label={`${selectedClass} 座位表`}>
+          <section className="classroom" aria-label={`${selectedClass?.name ?? '未选择班级'} 座位表`}>
             <div className="front-label">教室前方</div>
             <div className="podium"><span>讲 台</span><small>TEACHER</small></div>
             <div className="seat-grid">
-              {deskPairs.map((pair, index) => (
-                <div className="desk" key={index}>
-                  <StudentSeat student={pair[0]} />
-                  <span className="desk-divider" />
-                  <StudentSeat student={pair[1]} />
+              {draft?.desks.map((desk) => (
+                <div className="desk" key={desk.id}>
+                  {desk.seatIds.map((seatId) => (
+                    <StudentSeat
+                      key={seatId}
+                      seatId={seatId}
+                      student={studentsById.get(assignmentsBySeat.get(seatId) ?? '')}
+                      onPlace={placeSelectedStudent}
+                    />
+                  ))}
+                  {desk.capacity === 2 && <span className="desk-divider" />}
                 </div>
               ))}
             </div>
@@ -116,17 +251,23 @@ function App() {
           </section>
 
           <aside className="unassigned-panel">
-            <div><strong>待安排学生</strong><span>36</span></div>
-            <p>从这里拖入座位</p>
+            <div><strong>待安排学生</strong><span>{studentPool.length}</span></div>
+            <p>先选择学生，再点击空座位</p>
             <label><span aria-hidden="true">⌕</span><input placeholder="搜索学生" /></label>
-            {['方子墨', '宋依然', '叶星辰', '唐嘉懿'].map((name, index) => (
-              <button className={`student-list-item ${index % 2 ? 'female' : 'male'}`} key={name}>
-                <span>{name.slice(0, 1)}</span><strong>{name}</strong><small>{String(index + 7).padStart(2, '0')}号</small>
+            {studentPool.map((student) => (
+              <button
+                className={`student-list-item ${student.gender} ${selectedStudentId === student.id ? 'selected' : ''}`}
+                key={student.id}
+                onClick={() => setSelectedStudentId(student.id)}
+              >
+                <span>{student.name.slice(0, 1)}</span><strong>{student.name}</strong><small>{student.studentNo}号</small>
               </button>
             ))}
+            {selectedClass && studentPool.length === 0 && <p className="student-empty">所有学生都已安排，或尚未导入名单。</p>}
           </aside>
         </div>
       </section>
+      <PwaUpdatePrompt />
     </main>
   )
 }
