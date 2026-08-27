@@ -2,8 +2,13 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 import { defineConfig } from 'vitest/config'
 
+// Tauri sets TAURI_ENV_PLATFORM for its pre-build command, including on GitHub Actions.
+// Pages alone needs the repository subpath; desktop bundles must always use root-relative assets.
+const isTauriBuild = Boolean(process.env.TAURI_ENV_PLATFORM)
+const basePath = process.env.GITHUB_ACTIONS && !isTauriBuild ? '/classpilot/' : '/'
+
 export default defineConfig({
-  base: process.env.GITHUB_ACTIONS ? '/classpilot/' : '/',
+  base: basePath,
   plugins: [
     react(),
     VitePWA({
