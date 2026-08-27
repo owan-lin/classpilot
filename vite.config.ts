@@ -43,7 +43,11 @@ export default defineConfig({
     }),
   ],
   test: {
-    include: ['src/**/*.{test,spec}.{ts,tsx}'],
+    include: [
+      'src/**/*.{test,spec}.{ts,tsx}',
+      'tests/unit/**/*.{test,spec}.{ts,tsx}',
+      'tests/contracts/**/*.{test,spec}.{ts,tsx}',
+    ],
     environment: 'jsdom',
     setupFiles: './src/test/setup.ts',
     coverage: {
