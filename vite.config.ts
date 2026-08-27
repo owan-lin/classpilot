@@ -2,14 +2,21 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 import { defineConfig } from 'vitest/config'
 
+// Tauri sets TAURI_ENV_PLATFORM for its pre-build command, including on GitHub Actions.
+// Pages alone needs the repository subpath; desktop bundles must always use root-relative assets.
+const isTauriBuild = Boolean(process.env.TAURI_ENV_PLATFORM)
+const basePath = process.env.GITHUB_ACTIONS && !isTauriBuild ? '/classpilot/' : '/'
+
 export default defineConfig({
-  base: process.env.GITHUB_ACTIONS ? '/classpilot/' : '/',
+  base: basePath,
   plugins: [
     react(),
     VitePWA({
       registerType: 'prompt',
+      injectRegister: 'auto',
       includeAssets: [],
       manifest: {
+        id: './',
         name: 'ClassPilot 班级座位助手',
         short_name: 'ClassPilot',
         description: '离线优先的班级座位管理工具',
@@ -17,9 +24,21 @@ export default defineConfig({
         background_color: '#f3f6fa',
         display: 'standalone',
         lang: 'zh-CN',
+        start_url: './',
+        scope: './',
+        icons: [
+          {
+            src: 'favicon.svg',
+            sizes: 'any',
+            type: 'image/svg+xml',
+            purpose: 'any maskable',
+          },
+        ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,woff2,png,ico}'],
+        cleanupOutdatedCaches: true,
+        globPatterns: ['**/*.{js,css,html,woff2,png,svg,ico,webmanifest}'],
+        navigateFallbackDenylist: [/^\/api\//],
       },
     }),
   ],

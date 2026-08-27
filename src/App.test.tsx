@@ -6,7 +6,7 @@ describe('ClassPilot shell', () => {
   it('renders the primary classroom surface', () => {
     render(<App />)
     expect(screen.getByText('ClassPilot')).toBeInTheDocument()
-    expect(screen.getByLabelText('初二（3）班 座位表')).toBeInTheDocument()
+    expect(screen.getByLabelText('未选择班级 座位表')).toBeInTheDocument()
     expect(screen.getByText('讲 台')).toBeInTheDocument()
   })
 

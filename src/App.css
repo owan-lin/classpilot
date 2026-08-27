@@ -25,6 +25,7 @@ nav { display: grid; gap: 5px; }
 .class-item span { display: flex; align-items: center; gap: 8px; font-weight: 650; }
 .class-item small { padding-left: 25px; color: var(--muted); font-size: 11px; }
 .class-item.active { color: #234f73; background: #e7f0f8; }
+.empty-classes { margin: 7px 10px; color: var(--muted); font-size: 11px; line-height: 1.5; }
 .sidebar-spacer { flex: 1; }
 .sidebar-link { display: flex; align-items: center; gap: 9px; padding: 10px; color: #66758a; background: transparent; }
 .privacy-note { margin-top: 13px; padding: 11px 12px; display: grid; gap: 3px; background: #edf6f2; border: 1px solid #d8ebe3; border-radius: 9px; }
@@ -38,6 +39,7 @@ nav { display: grid; gap: 5px; }
 .toolbar button { height: 38px; padding: 0 15px; display: flex; align-items: center; gap: 7px; border-radius: 8px; font-size: 13px; font-weight: 700; }
 .secondary { background: #f2f5f8; border: 1px solid var(--line); }
 .publish { color: white; background: var(--navy); }
+.toolbar button:disabled { cursor: not-allowed; opacity: .5; }
 .modebar { height: 60px; padding: 0 28px; display: flex; align-items: center; gap: 16px; background: #fbfcfd; border-bottom: 1px solid var(--line); }
 .modebar > span { color: var(--muted); font-size: 12px; }
 .segmented { padding: 3px; display: flex; background: #e9eef3; border-radius: 8px; }
@@ -77,6 +79,13 @@ nav { display: grid; gap: 5px; }
 .student-list-item > span { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; font-size: 11px; font-weight: 800; }
 .student-list-item.male > span { background: var(--blue-soft); }.student-list-item.female > span { background: var(--pink-soft); }
 .student-list-item strong { font-size: 11px; }.student-list-item small { color: var(--muted); font-size: 9px; }
+.student-list-item.selected { border-color: var(--navy); box-shadow: 0 0 0 2px rgba(40,83,120,.1); }
+.student-empty { padding: 12px 3px; line-height: 1.5; }
+.pwa-update { position: fixed; z-index: 20; right: 22px; bottom: 22px; max-width: 460px; padding: 13px 14px; display: flex; align-items: center; gap: 11px; color: #fff; background: #203f5a; border-radius: 11px; box-shadow: 0 12px 35px rgba(24,38,58,.25); }
+.pwa-update div { display: grid; gap: 2px; }
+.pwa-update strong { font-size: 12px; }.pwa-update span { font-size: 10px; opacity: .8; }
+.pwa-update button { padding: 7px 10px; flex: none; color: #203f5a; background: #fff; border-radius: 6px; font-size: 11px; font-weight: 800; }
+.pwa-update .pwa-later { color: #fff; background: transparent; }
 
 @media (max-width: 1250px) {
   .app-shell { grid-template-columns: 205px 1fr; }
