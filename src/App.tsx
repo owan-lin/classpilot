@@ -22,7 +22,18 @@ function App({ repository = classRepository }: { repository?: ClassRepository })
   const [form, setForm] = useState(emptyStudent), [editId, setEditId] = useState<string>(), [newName, setNewName] = useState(''), [newOpen, setNewOpen] = useState(false), [message, setMessage] = useState('新建班级后即可录入学生并排座')
   const session = useRef<DraftSession | undefined>(undefined); const dragging = useRef<{ id: string; x: number; y: number } | undefined>(undefined)
   useEffect(() => { void repository.listClasses().then((data) => { setClasses(data); setClassId((id) => id && data.some((x) => x.id === id) ? id : data[0]?.id) }) }, [repository])
-  useEffect(() => { if (!classId) { setStudents([]); setDraft(undefined); return }; let live = true; void Promise.all([repository.listStudents(classId), repository.getDraft(classId)]).then(async ([roster, saved]) => { const next = saved ?? createDefaultDraft(classId); if (!saved) await repository.saveDraft(next); if (!live) return; setStudents(roster); setDraft(next); session.current = new DraftSession(next, repository, 180); session.current.subscribe((history) => setDraft(history.present)) }); return () => { live = false; void session.current?.dispose(); session.current = undefined } }, [classId, repository])
+  useEffect(() => { if (!classId) { setStudents([]); setDraft(undefined); return }; let live = true; void Promise.all([repository.listStudents(classId), repository.getDraft(classId)]).then(async ([roster, saved]) => { const next = saved ?? createDefaultDraft(classId); if (!saved) await repository.saveDraft(next); if (!live) return; setStudents(roster); setDraft(next); session.current = new DraftSession(next, repository, 180); session.current.subscribe((history) => setDraft(history.present)) }).catch(() => undefined); return () => { live = false; void session.current?.dispose().catch(() => undefined); session.current = undefined } }, [classId, repository])
+  useEffect(() => {
+    const cancelCurrentAction = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      setSelectedId(undefined)
+      setProfile(undefined)
+      setNewOpen(false)
+      setMessage('已取消当前操作')
+    }
+    window.addEventListener('keydown', cancelCurrentAction)
+    return () => window.removeEventListener('keydown', cancelCurrentAction)
+  }, [])
   const active = classes.find((x) => x.id === classId), bySeat = useMemo(() => new Map(draft?.assignments.map((x) => [x.seatId, x.studentId])), [draft]), byId = useMemo(() => new Map(students.map((x) => [x.id, x])), [students]), assigned = useMemo(() => new Set(draft?.assignments.map((x) => x.studentId)), [draft]), pool = students.filter((x) => !assigned.has(x.id))
   const change = (fn: (current: LayoutDraft) => LayoutDraft) => session.current?.update(fn)
   const seat = (seatId: string, occupant?: StudentRecord) => { if (selectedId) { const incoming = byId.get(selectedId); if (occupant && incoming && !confirm(`将 ${incoming.name} 与 ${occupant.name} 换位？`)) return; change((d) => ({ ...d, assignments: placeStudent(d.assignments, selectedId, seatId) })); setSelectedId(undefined); setMessage(occupant ? '已确认换位并自动保存' : '座位已更新并自动保存') } else if (occupant) setProfile(occupant); else setMessage('先点一名学生，再点空位；也可以直接拖动学生卡片。') }
