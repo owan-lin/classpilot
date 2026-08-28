@@ -1,20 +1,52 @@
 import { expect, test } from '@playwright/test'
 
 const deploymentBase = process.env.CI ? '/classpilot' : ''
+type Student = { name: string; studentNo: string }
+type Page = import('@playwright/test').Page
 
-async function createClass(page: import('@playwright/test').Page, name: string) {
-  await page.locator('.new-class').click()
+async function createClass(page: Page, name: string) {
+  await page.getByRole('button', { name: '新建班级' }).first().click()
   await page.getByRole('textbox', { name: '班级名称' }).fill(name)
-  await page.getByRole('button', { name: '创建班级', exact: true }).click()
-  await expect(page.getByRole('region', { name: `${name} 座位表` })).toBeVisible()
+  await page.getByRole('button', { name: '创建班级并开始' }).click()
+  await expect(page.getByRole('region', { name: `${name} 教室座位画布` })).toBeVisible()
+}
+async function openStudents(page: Page) {
+  await page.getByRole('button', { name: '录入学生' }).click()
 }
 
-test('creates an empty local class and initializes its seating workspace', async ({ page }) => {
+async function addStudent(page: Page, student: Student) {
+  await page.getByRole('textbox', { name: '姓名' }).fill(student.name)
+  await page.getByRole('textbox', { name: '学号（可选）' }).fill(student.studentNo)
+  await page.getByRole('button', { name: '保存并继续' }).click()
+  await expect(page.getByRole('button', { name: new RegExp(`${student.name}.*${student.studentNo}`) })).toBeVisible()
+}
+
+async function openSeating(page: Page) {
+  await page.getByRole('button', { name: '排座 / 移位' }).click()
+  await expect(page.getByRole('complementary', { name: '待安排学生' })).toBeVisible()
+}
+
+function desk(page: Page, number: number) {
+  return page.getByRole('article', { name: new RegExp(`第 ${number} 桌，`) })
+}
+
+function emptySeat(page: Page, deskNumber: number, seatNumber: number) {
+  return desk(page, deskNumber).getByRole('button', { name: `第 ${deskNumber} 桌第 ${seatNumber} 座，空座位` })
+}
+
+function poolStudent(page: Page, name: string) {
+  return page.locator('.pool-student').filter({ hasText: name })
+}
+
+test('空状态可以新建班级，并只暴露四个核心工作入口', async ({ page }) => {
   await page.goto('/')
-  await expect(page.getByText('ClassPilot')).toBeVisible()
   await expect(page.getByText('先创建一个班级')).toBeVisible()
-  await createClass(page, '虚构空班')
-  await expect(page.getByText('尚未导入学生')).toBeVisible()
+  await createClass(page, '核心空班')
+
+  await expect(page.getByRole('button', { name: '排座 / 移位' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '编辑教室' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '录入学生' })).toBeVisible()
+  await expect(page.getByText(/Excel|导入|历史|备份|导出|打印/)).toHaveCount(0)
 })
 
 test('publishes standalone PWA manifest metadata', async ({ request }) => {
@@ -36,34 +68,155 @@ test('publishes standalone PWA manifest metadata', async ({ request }) => {
   expect(icon.ok()).toBe(true)
 })
 
-test('reloads a locally created class from the cached app while offline', async ({ context, page }) => {
+test('不用 Excel 也能连续手动录入三名学生，并校验空名与重复学号', async ({ page }) => {
   await page.goto('/')
-  await createClass(page, '离线虚构班')
-  await page.evaluate(async () => {
-    await navigator.serviceWorker.ready
+  await createClass(page, '手动录入班')
+  await openStudents(page)
+
+  await page.getByRole('button', { name: '保存并继续' }).click()
+  await expect(page.getByRole('alert')).toContainText('请输入学生姓名')
+
+  await addStudent(page, { name: '虚构甲', studentNo: 'A-01' })
+  await addStudent(page, { name: '虚构乙', studentNo: 'A-02' })
+  await addStudent(page, { name: '虚构丙', studentNo: 'A-03' })
+  await expect(page.getByRole('heading', { name: /学生档案 3/ })).toBeVisible()
+
+  await page.getByRole('textbox', { name: '姓名' }).fill('重复号学生')
+  await page.getByRole('textbox', { name: '学号（可选）' }).fill('A-02')
+  await page.getByRole('button', { name: '保存并继续' }).click()
+  await expect(page.getByRole('alert')).toContainText('已存在')
+  await expect(page.getByRole('heading', { name: /学生档案 3/ })).toBeVisible()
+})
+
+test('支持点击排座、拖入空位、拖出空位、占座交换确认与取消', async ({ page }) => {
+  await page.goto('/')
+  await createClass(page, '移位交互班')
+  await openStudents(page)
+  await addStudent(page, { name: '拖动甲', studentNo: 'D-01' })
+  await addStudent(page, { name: '拖动乙', studentNo: 'D-02' })
+  await addStudent(page, { name: '拖动丙', studentNo: 'D-03' })
+  await openSeating(page)
+
+  await poolStudent(page, '拖动甲').click()
+  await emptySeat(page, 1, 1).click()
+  await expect(desk(page, 1).getByRole('button', { name: /拖动甲.*D-01/ })).toBeVisible()
+
+  await poolStudent(page, '拖动乙').dragTo(emptySeat(page, 1, 2))
+  await expect(desk(page, 1).getByRole('button', { name: /拖动乙.*D-02/ })).toBeVisible()
+
+  await desk(page, 1).getByRole('button', { name: /拖动乙.*D-02/ }).dragTo(emptySeat(page, 2, 1))
+  await expect(desk(page, 2).getByRole('button', { name: /拖动乙.*D-02/ })).toBeVisible()
+
+  const first = desk(page, 1).getByRole('button', { name: /拖动甲.*D-01/ })
+  const second = desk(page, 2).getByRole('button', { name: /拖动乙.*D-02/ })
+  page.once('dialog', async (dialog) => {
+    expect(dialog.type()).toBe('confirm')
+    expect(dialog.message()).toContain('拖动甲')
+    await dialog.dismiss()
   })
+  await first.dragTo(second)
+  await expect(first).toBeVisible()
+  await expect(second).toBeVisible()
 
+  page.once('dialog', async (dialog) => {
+    expect(dialog.type()).toBe('confirm')
+    await dialog.accept()
+  })
+  await first.dragTo(second)
+  await expect(desk(page, 1).getByRole('button', { name: /拖动乙.*D-02/ })).toBeVisible()
+  await expect(desk(page, 2).getByRole('button', { name: /拖动甲.*D-01/ })).toBeVisible()
+})
+
+test('打开和关闭学生档案后仍保留排座上下文，Escape 可取消弹层', async ({ page }) => {
+  await page.goto('/')
+  await createClass(page, '档案上下文班')
+  await openStudents(page)
+  await addStudent(page, { name: '档案甲', studentNo: 'P-01' })
+  await openSeating(page)
+  await poolStudent(page, '档案甲').click()
+  await emptySeat(page, 1, 1).click()
+
+  await desk(page, 1).getByRole('button', { name: /档案甲.*P-01/ }).click()
+  await expect(page.getByRole('dialog', { name: '档案甲' })).toBeVisible()
+  await page.getByRole('button', { name: '关闭学生档案' }).click()
+  await expect(page.getByRole('dialog', { name: '档案甲' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: '排座 / 移位' })).toHaveAttribute('aria-pressed', 'true')
+
+  await desk(page, 1).getByRole('button', { name: /档案甲.*P-01/ }).click()
+  await expect(page.getByRole('dialog', { name: '档案甲' })).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('dialog', { name: '档案甲' })).toHaveCount(0)
+})
+
+test('教室编辑器支持普通/特殊座位增删、对齐与自由移动并持久化坐标', async ({ page }) => {
+  await page.goto('/')
+  await createClass(page, '画布编辑班')
+  await page.getByRole('button', { name: '编辑教室' }).click()
+  const canvas = page.getByRole('region', { name: '画布编辑班 教室座位画布' })
+  await expect(canvas).toBeVisible()
+  await expect(page.getByRole('button', { name: '对齐模式' })).toHaveAttribute('aria-pressed', 'true')
+
+  const initialCount = await canvas.getByRole('article').count()
+  await page.getByRole('button', { name: '+ 普通座位' }).click()
+  await page.getByRole('button', { name: '+ 特殊座位' }).click()
+  await expect(canvas.getByRole('article')).toHaveCount(initialCount + 2)
+
+  const addedRegular = page.getByRole('article', { name: `第 ${initialCount + 1} 桌，2 个座位` })
+  const addedSpecial = page.getByRole('article', { name: '特殊座，1 个座位' })
+  page.once('dialog', (dialog) => dialog.accept())
+  await addedRegular.getByRole('button', { name: `删除课桌 ${initialCount + 1}` }).click()
+  page.once('dialog', (dialog) => dialog.accept())
+  await addedSpecial.getByRole('button', { name: '删除特殊座' }).click()
+  await expect(canvas.getByRole('article')).toHaveCount(initialCount)
+
+  await page.getByRole('button', { name: '重排对齐' }).click()
+  await expect(page.getByRole('status')).toContainText('按网格对齐')
+  await page.getByRole('button', { name: '自由移动' }).click()
+  const firstDesk = desk(page, 1)
+  const before = await firstDesk.getAttribute('style')
+  const box = await firstDesk.locator('header').boundingBox()
+  expect(box).not.toBeNull()
+  if (!box) throw new Error('课桌没有可拖动的边界框')
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(box.x + 24, box.y + 74)
+  await page.mouse.up()
+  await expect.poll(() => firstDesk.getAttribute('style')).not.toBe(before)
+  const moved = await firstDesk.getAttribute('style')
+  await page.waitForTimeout(300)
   await page.reload()
-  await page.waitForFunction(() => Boolean(navigator.serviceWorker.controller))
+  await expect(page.getByRole('region', { name: '画布编辑班 教室座位画布' })).toBeVisible()
+  await page.getByRole('button', { name: '编辑教室' }).click()
+  await expect.poll(() => desk(page, 1).getAttribute('style')).toBe(moved)
+})
 
-  await context.setOffline(true)
-  try {
-    await page.reload({ waitUntil: 'domcontentloaded' })
-    await expect(page.getByText('ClassPilot')).toBeVisible()
-    await expect(page.getByRole('region', { name: '离线虚构班 座位表' })).toBeVisible()
-    await expect(page.getByText('尚未导入学生')).toBeVisible()
-  } finally {
-    await context.setOffline(false)
+test('删除占座课桌后学生回到待安排区且资料不丢失', async ({ page }) => {
+  await page.goto('/')
+  await createClass(page, '删除课桌班')
+  await openStudents(page)
+  await addStudent(page, { name: '保留甲', studentNo: 'K-01' })
+  await openSeating(page)
+  await poolStudent(page, '保留甲').click()
+  await emptySeat(page, 1, 1).click()
+  await page.getByRole('button', { name: '编辑教室' }).click()
+
+  page.once('dialog', async (dialog) => {
+    expect(dialog.message()).toContain('1 名学生')
+    await dialog.accept()
+  })
+  await desk(page, 1).getByRole('button', { name: '删除课桌 1' }).click()
+  await expect(page.getByRole('status')).toContainText('回到待安排区')
+  await openSeating(page)
+  await expect(poolStudent(page, '保留甲')).toContainText('K-01')
+})
+
+test.describe('响应式核心工作台', () => {
+  for (const width of [375, 768, 1024, 1440]) {
+    test(`${width}px 没有页面级横向溢出`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 })
+      await page.goto('/')
+      await createClass(page, `响应式${width}`)
+      await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+    })
   }
 })
-
-test('restores a published history snapshot into a new draft', async ({ page }) => {
-  await page.goto('/')
-  await createClass(page, '历史虚构班')
-  await page.getByRole('button', { name: '启用此座位表' }).click()
-  await page.getByRole('button', { name: /历史版本 1/ }).click()
-  await expect(page.getByRole('dialog', { name: '座位历史版本' })).toBeVisible()
-  await page.getByRole('button', { name: '恢复为草稿' }).click()
-  await expect(page.getByText('历史版本已恢复为新的座位草稿，原历史记录保持不变')).toBeVisible()
-})
-
