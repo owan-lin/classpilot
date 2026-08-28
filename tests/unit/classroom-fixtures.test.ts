@@ -1,7 +1,7 @@
 import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
 import {
-  backupEnvelopeArbitrary,
+  backupDataArbitrary,
   duplicateStudentNumberRoster,
   emptySeatingScenarioArbitrary,
   insufficientSeatingScenarioArbitrary,
@@ -45,14 +45,11 @@ describe('fictional classroom arbitraries', () => {
     }), { numRuns: 100 })
   })
 
-  it('generates self-consistent full backup envelopes with fictional data', () => {
-    fc.assert(fc.property(backupEnvelopeArbitrary, (backup) => {
-      const { data } = backup
+  it('generates self-consistent full backup data with fictional records', () => {
+    fc.assert(fc.property(backupDataArbitrary, (data) => {
       const classIds = new Set(data.classes.map(({ id }) => id))
       const studentIds = new Set(data.students.map(({ id }) => id))
 
-      expect(backup.schemaVersion).toBe(2)
-      expect(backup.format).toBe('classpilot-backup')
       expect(data.students.every(({ classId }) => classIds.has(classId))).toBe(true)
       expect(data.drafts.every(({ classId }) => classIds.has(classId))).toBe(true)
       expect(data.snapshots.every(({ classId }) => classIds.has(classId))).toBe(true)

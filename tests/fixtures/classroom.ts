@@ -1,13 +1,13 @@
 import fc from 'fast-check'
 import type {
-  BackupEnvelope,
+  BackupData,
   DeskRecord,
   LayoutDraft,
   SeatAssignment,
   StudentRecord,
 } from '../../src/domain/types'
 
-const timestamp = '2026-08-01T12:00:00.000Z'
+export const testTimestamp = '2026-08-01T12:00:00.000Z'
 
 export interface SeatingScenario {
   students: StudentRecord[]
@@ -66,8 +66,8 @@ function scenarioArbitrary(dimensionsArbitrary: fc.Arbitrary<ScenarioDimensions>
           preferredDeskMateStudentIds: [],
         },
         archived: false,
-        createdAt: timestamp,
-        updatedAt: timestamp,
+        createdAt: testTimestamp,
+        updatedAt: testTimestamp,
       }))
 
       const desks: DeskRecord[] = deskIds.map((id, index) => {
@@ -82,17 +82,14 @@ function scenarioArbitrary(dimensionsArbitrary: fc.Arbitrary<ScenarioDimensions>
           width: deskSeatIds.length === 1 ? 80 : 160,
           height: 72,
           seatIds: deskSeatIds,
-          createdAt: timestamp,
-          updatedAt: timestamp,
+          createdAt: testTimestamp,
+          updatedAt: testTimestamp,
         }
       })
 
       const assignments = students
         .slice(0, seatCount)
-        .map((student, index) => ({
-          studentId: student.id,
-          seatId: seatIds[index],
-        }))
+        .map((student, index) => ({ studentId: student.id, seatId: seatIds[index] }))
 
       return {
         students,
@@ -104,8 +101,8 @@ function scenarioArbitrary(dimensionsArbitrary: fc.Arbitrary<ScenarioDimensions>
           podium: { x: 240, y: 16, width: 160, height: 64 },
           desks,
           assignments,
-          createdAt: timestamp,
-          updatedAt: timestamp,
+          createdAt: testTimestamp,
+          updatedAt: testTimestamp,
         },
       }
     })
@@ -157,40 +154,33 @@ export const duplicateStudentNumberRoster = scenarioArbitrary(
     studentCount,
     seatCount: studentCount,
   })),
-)
-  .map(({ students }) => students.map((student, index) => (
-    index === 1 ? { ...student, studentNo: students[0].studentNo } : student
-  )))
+).map(({ students }) => students.map((student, index) => (
+  index === 1 ? { ...student, studentNo: students[0].studentNo } : student
+)))
 
-export const backupEnvelopeArbitrary: fc.Arbitrary<BackupEnvelope> = seatingScenarioArbitrary
+export const backupDataArbitrary: fc.Arbitrary<BackupData> = seatingScenarioArbitrary
   .chain((scenario) => fc.uuid().map((snapshotId) => ({
-    format: 'classpilot-backup' as const,
-    schemaVersion: 2 as const,
-    exportedAt: timestamp,
-    checksum: { algorithm: 'SHA-256' as const, value: '0'.repeat(64) },
-    data: {
-      classes: [{
-        id: scenario.draft.classId,
-        name: '虚构测试班级',
-        grade: '测试年级',
-        academicYear: '2026-2027',
-        archived: false,
-        createdAt: timestamp,
-        updatedAt: timestamp,
-      }],
-      students: scenario.students,
-      drafts: [scenario.draft],
-      snapshots: [{
-        id: snapshotId,
-        classId: scenario.draft.classId,
-        title: '虚构历史版本',
-        effectiveAt: timestamp,
-        layout: scenario.draft,
-        studentNames: Object.fromEntries(
-          scenario.students.map((student) => [student.id, student.name]),
-        ),
-        createdAt: timestamp,
-        updatedAt: timestamp,
-      }],
-    },
+    classes: [{
+      id: scenario.draft.classId,
+      name: '虚构测试班级',
+      grade: '测试年级',
+      academicYear: '2026-2027',
+      archived: false,
+      createdAt: testTimestamp,
+      updatedAt: testTimestamp,
+    }],
+    students: scenario.students,
+    drafts: [scenario.draft],
+    snapshots: [{
+      id: snapshotId,
+      classId: scenario.draft.classId,
+      title: '虚构历史版本',
+      effectiveAt: testTimestamp,
+      layout: scenario.draft,
+      studentNames: Object.fromEntries(
+        scenario.students.map((student) => [student.id, student.name]),
+      ),
+      createdAt: testTimestamp,
+      updatedAt: testTimestamp,
+    }],
   })))
