@@ -31,13 +31,13 @@ function clone<T>(value: T): T {
 }
 
 function requireText(value: string, label: string): string {
-  const normalized = value.normalize('NFKC').trim()
-  if (!normalized) throw new Error(`${label}不能为空`)
-  return normalized
+  const trimmed = value.trim()
+  if (!trimmed) throw new Error(`${label}不能为空`)
+  return trimmed
 }
 
 export function canonicalStudentNo(studentNo: string): string {
-  return requireText(studentNo, '学号').toLowerCase()
+  return requireText(studentNo, '学号').normalize('NFKC').toLowerCase()
 }
 
 function uniqueText(values: readonly string[]): string[] {
@@ -47,7 +47,7 @@ function uniqueText(values: readonly string[]): string[] {
 function normalizeStudent(input: NewStudentRecord): NewStudentRecord {
   return {
     ...clone(input),
-    studentNo: requireText(input.studentNo, '学号'),
+    studentNo: requireText(input.studentNo, '学号').normalize('NFKC'),
     name: requireText(input.name, '姓名'),
     roles: uniqueText(input.roles),
     characterTags: uniqueText(input.characterTags),
@@ -185,7 +185,7 @@ export class DexieClassRepository implements ClassRepository {
   }
 
   async updateStudent(id: EntityId, changes: StudentRecordChanges): Promise<StudentRecord> {
-    return this.database.transaction('rw', this.database.students, async () => {
+    return this.database.transaction('rw', [this.database.students, this.database.drafts], async () => {
       const current = await requireRecord(() => this.database.students.get(id), '学生')
       const merged = normalizeStudent({ ...current, ...clone(changes) })
       await this.assertStudentNoAvailable(current.classId, merged.studentNo, id)
@@ -197,6 +197,16 @@ export class DexieClassRepository implements ClassRepository {
         updatedAt: this.dependencies.now(),
       }
       await this.database.students.put(next)
+      if (next.archived && !current.archived) {
+        const draft = await this.database.drafts.where('classId').equals(current.classId).first()
+        if (draft?.assignments.some(({ studentId }) => studentId === id)) {
+          await this.database.drafts.put({
+            ...draft,
+            assignments: draft.assignments.filter(({ studentId }) => studentId !== id),
+            updatedAt: this.dependencies.now(),
+          })
+        }
+      }
       return clone(next)
     })
   }
@@ -227,7 +237,16 @@ export class DexieClassRepository implements ClassRepository {
       await requireRecord(() => this.database.classes.get(draft.classId), '班级')
       const existing = await this.database.drafts.where('classId').equals(draft.classId).first()
       const seatIds = draft.desks.flatMap((desk) => desk.seatIds)
+      if (new Set(draft.desks.map(({ id }) => id)).size !== draft.desks.length) {
+        throw new Error('草稿包含重复课桌')
+      }
       if (new Set(seatIds).size !== seatIds.length) throw new Error('草稿包含重复座位')
+      if (draft.desks.some((desk) => desk.classId !== draft.classId)) {
+        throw new Error('草稿课桌必须属于当前班级')
+      }
+      if (draft.desks.some((desk) => desk.seatIds.length !== desk.capacity)) {
+        throw new Error('课桌容量与座位数量不一致')
+      }
       if (new Set(draft.assignments.map(({ seatId }) => seatId)).size !== draft.assignments.length) {
         throw new Error('同一座位不能安排多个学生')
       }
@@ -292,12 +311,35 @@ export class DexieClassRepository implements ClassRepository {
   }
 
   async restoreSnapshot(snapshotId: EntityId): Promise<LayoutDraft> {
-    return this.database.transaction('rw', [this.database.snapshots, this.database.drafts], async () => {
+    return this.database.transaction('rw', [
+      this.database.classes,
+      this.database.students,
+      this.database.snapshots,
+      this.database.drafts,
+    ], async () => {
       const snapshot = await requireRecord(() => this.database.snapshots.get(snapshotId), '历史版本')
+      await requireRecord(() => this.database.classes.get(snapshot.classId), '班级')
+      const activeStudentIds = new Set(
+        (await this.database.students.where('classId').equals(snapshot.classId).toArray())
+          .filter(({ archived }) => !archived)
+          .map(({ id }) => id),
+      )
+      const validSeatIds = new Set(snapshot.layout.desks.flatMap((desk) => desk.seatIds))
+      const assignedSeats = new Set<EntityId>()
+      const assignedStudents = new Set<EntityId>()
+      const assignments = snapshot.layout.assignments.filter((assignment) => {
+        if (!validSeatIds.has(assignment.seatId) || !activeStudentIds.has(assignment.studentId)) return false
+        if (assignedSeats.has(assignment.seatId) || assignedStudents.has(assignment.studentId)) return false
+        assignedSeats.add(assignment.seatId)
+        assignedStudents.add(assignment.studentId)
+        return true
+      })
       const timestamp = this.dependencies.now()
       const restored: LayoutDraft = {
         ...clone(snapshot.layout),
         id: this.dependencies.createId(),
+        classId: snapshot.classId,
+        assignments,
         createdAt: timestamp,
         updatedAt: timestamp,
       }

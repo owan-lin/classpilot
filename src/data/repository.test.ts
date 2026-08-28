@@ -91,6 +91,73 @@ describe('DexieClassRepository', () => {
     expect(restored.assignments).toEqual(snapshot.layout.assignments)
   })
 
+  it('keeps a restored draft valid when a snapshot student was later archived', async () => {
+    const { repository } = createRepository()
+    const classroom = await repository.createClass({ name: '归档快照测试班', grade: '', academicYear: '' })
+    const student = await repository.createStudent(newStudent(classroom.id))
+    const draft: LayoutDraft = {
+      id: crypto.randomUUID(),
+      classId: classroom.id,
+      podium: { x: 0, y: 0, width: 100, height: 50 },
+      desks: [{
+        id: crypto.randomUUID(),
+        classId: classroom.id,
+        kind: 'regular',
+        capacity: 1,
+        x: 0,
+        y: 100,
+        width: 100,
+        height: 60,
+        seatIds: ['seat-a'],
+        createdAt: '2026-08-27T00:00:00.000Z',
+        updatedAt: '2026-08-27T00:00:00.000Z',
+      }],
+      assignments: [{ seatId: 'seat-a', studentId: student.id }],
+      createdAt: '2026-08-27T00:00:00.000Z',
+      updatedAt: '2026-08-27T00:00:00.000Z',
+    }
+    await repository.saveDraft(draft)
+    const snapshot = await repository.publishSnapshot({ classId: classroom.id, title: '归档前' })
+    await repository.updateStudent(student.id, { archived: true })
+
+    expect((await repository.getDraft(classroom.id))?.assignments).toEqual([])
+    const restored = await repository.restoreSnapshot(snapshot.id)
+    expect(restored.assignments).toEqual([])
+    expect((await repository.listSnapshots(classroom.id))[0].layout.assignments).toHaveLength(1)
+  })
+
+  it('rejects drafts with foreign or malformed desks before persisting', async () => {
+    const { repository } = createRepository()
+    const classroom = await repository.createClass({ name: '草稿校验班', grade: '', academicYear: '' })
+    const malformed: LayoutDraft = {
+      id: crypto.randomUUID(),
+      classId: classroom.id,
+      podium: { x: 0, y: 0, width: 100, height: 50 },
+      desks: [{
+        id: crypto.randomUUID(),
+        classId: 'other-class',
+        kind: 'regular',
+        capacity: 2,
+        x: 0,
+        y: 100,
+        width: 100,
+        height: 60,
+        seatIds: ['seat-a'],
+        createdAt: '2026-08-27T00:00:00.000Z',
+        updatedAt: '2026-08-27T00:00:00.000Z',
+      }],
+      assignments: [],
+      createdAt: '2026-08-27T00:00:00.000Z',
+      updatedAt: '2026-08-27T00:00:00.000Z',
+    }
+    await expect(repository.saveDraft(malformed)).rejects.toThrow('当前班级')
+
+    await expect(repository.saveDraft({
+      ...malformed,
+      desks: [{ ...malformed.desks[0], classId: classroom.id }],
+    })).rejects.toThrow('容量')
+  })
+
   it('exports and restores a validated cross-device backup', async () => {
     const source = createRepository().repository
     const classroom = await source.createClass({ name: '备份测试班', grade: '', academicYear: '' })

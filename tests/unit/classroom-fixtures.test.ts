@@ -47,16 +47,18 @@ describe('fictional classroom arbitraries', () => {
 
   it('generates self-consistent full backup envelopes with fictional data', () => {
     fc.assert(fc.property(backupEnvelopeArbitrary, (backup) => {
-      const classIds = new Set(backup.classes.map(({ id }) => id))
-      const studentIds = new Set(backup.students.map(({ id }) => id))
+      const { data } = backup
+      const classIds = new Set(data.classes.map(({ id }) => id))
+      const studentIds = new Set(data.students.map(({ id }) => id))
 
-      expect(backup.schemaVersion).toBe(1)
-      expect(backup.students.every(({ classId }) => classIds.has(classId))).toBe(true)
-      expect(backup.drafts.every(({ classId }) => classIds.has(classId))).toBe(true)
-      expect(backup.snapshots.every(({ classId }) => classIds.has(classId))).toBe(true)
-      expect(backup.drafts.flatMap(({ assignments }) => assignments)
+      expect(backup.schemaVersion).toBe(2)
+      expect(backup.format).toBe('classpilot-backup')
+      expect(data.students.every(({ classId }) => classIds.has(classId))).toBe(true)
+      expect(data.drafts.every(({ classId }) => classIds.has(classId))).toBe(true)
+      expect(data.snapshots.every(({ classId }) => classIds.has(classId))).toBe(true)
+      expect(data.drafts.flatMap(({ assignments }) => assignments)
         .every(({ studentId }) => studentIds.has(studentId))).toBe(true)
-      expect(backup.students.every(({ name }) => name.startsWith('虚构学生'))).toBe(true)
+      expect(data.students.every(({ name }) => name.startsWith('虚构学生'))).toBe(true)
     }), { numRuns: 100 })
   })
 })

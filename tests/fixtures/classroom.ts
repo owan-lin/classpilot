@@ -163,31 +163,34 @@ export const duplicateStudentNumberRoster = scenarioArbitrary(
   )))
 
 export const backupEnvelopeArbitrary: fc.Arbitrary<BackupEnvelope> = seatingScenarioArbitrary
-  .chain((scenario) => fc.tuple(fc.uuid(), fc.uuid()).map(([snapshotId, checksum]) => ({
-    schemaVersion: 1 as const,
+  .chain((scenario) => fc.uuid().map((snapshotId) => ({
+    format: 'classpilot-backup' as const,
+    schemaVersion: 2 as const,
     exportedAt: timestamp,
-    checksum,
-    classes: [{
-      id: scenario.draft.classId,
-      name: '虚构测试班级',
-      grade: '测试年级',
-      academicYear: '2026-2027',
-      archived: false,
-      createdAt: timestamp,
-      updatedAt: timestamp,
-    }],
-    students: scenario.students,
-    drafts: [scenario.draft],
-    snapshots: [{
-      id: snapshotId,
-      classId: scenario.draft.classId,
-      title: '虚构历史版本',
-      effectiveAt: timestamp,
-      layout: scenario.draft,
-      studentNames: Object.fromEntries(
-        scenario.students.map((student) => [student.id, student.name]),
-      ),
-      createdAt: timestamp,
-      updatedAt: timestamp,
-    }],
+    checksum: { algorithm: 'SHA-256' as const, value: '0'.repeat(64) },
+    data: {
+      classes: [{
+        id: scenario.draft.classId,
+        name: '虚构测试班级',
+        grade: '测试年级',
+        academicYear: '2026-2027',
+        archived: false,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      }],
+      students: scenario.students,
+      drafts: [scenario.draft],
+      snapshots: [{
+        id: snapshotId,
+        classId: scenario.draft.classId,
+        title: '虚构历史版本',
+        effectiveAt: timestamp,
+        layout: scenario.draft,
+        studentNames: Object.fromEntries(
+          scenario.students.map((student) => [student.id, student.name]),
+        ),
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      }],
+    },
   })))

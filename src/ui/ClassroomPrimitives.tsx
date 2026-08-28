@@ -123,7 +123,11 @@ export function EmptyState({ title, description, action }: { title: string; desc
   )
 }
 
-export function ProfileDrawer({ student, onClose }: { student: StudentRecord; onClose: () => void }) {
+export function ProfileDrawer({ student, onClose, onBeginMove }: {
+  student: StudentRecord
+  onClose: () => void
+  onBeginMove(student: StudentRecord): void
+}) {
   const gender = genderMeta[student.gender]
   const frontPreference = frontPreferenceMeta[student.constraints.frontPreference]
   const isFrontPriority = student.constraints.frontPreference !== 'none'
@@ -164,7 +168,7 @@ export function ProfileDrawer({ student, onClose }: { student: StudentRecord; on
 
       <footer className="profile-drawer__footer">
         <button type="button" className="button-secondary" onClick={onClose}>完成</button>
-        <button type="button" className="button-primary">打开完整档案</button>
+        <button type="button" className="button-primary" onClick={() => onBeginMove(student)}>调整座位</button>
       </footer>
     </aside>
   )

@@ -159,6 +159,16 @@ function App({ repository = classRepository }: { repository?: ClassRepository })
   const canvasScale = zoom / 100
   const scaleStyle = { '--canvas-scale': canvasScale } as CSSProperties
 
+  function resetWorkspace(): void {
+    setStudents([])
+    setDraft(undefined)
+    setSnapshots([])
+    setCanUndo(false)
+    setCanRedo(false)
+    setSelectedStudentId(undefined)
+    setOpenStudent(null)
+  }
+
   async function createClass(): Promise<void> {
     try {
       const classroom = await repository.createClass({
@@ -196,6 +206,7 @@ function App({ repository = classRepository }: { repository?: ClassRepository })
       }
       await repository.saveDraft(nextDraft)
       setClasses((current) => [...current, classroom])
+      resetWorkspace()
       setSelectedClassId(classroom.id)
       setShowCreateDialog(false)
       setNewClassSetup((current) => ({ ...current, name: '', grade: '' }))
@@ -273,16 +284,24 @@ function App({ repository = classRepository }: { repository?: ClassRepository })
   function activateSeat(seatId: string, student?: StudentRecord): void {
     if (!seatId) return
     if (selectedStudentId && sessionRef.current) {
+      const sourceSeatId = draft?.assignments.find(({ studentId }) => studentId === selectedStudentId)?.seatId
+      const targetOccupied = assignmentsBySeat.has(seatId)
       sessionRef.current.update((current) => ({
         ...current,
         assignments: placeStudent(current.assignments, selectedStudentId, seatId),
       }))
       setSelectedStudentId(undefined)
-      setStatus('座位已调整，草稿正在本地保存')
+      setStatus(sourceSeatId && targetOccupied ? '座位已交换，草稿正在本地保存' : '座位已调整，草稿正在本地保存')
       return
     }
     if (student) setOpenStudent(student)
     else setStatus(studentPool.length > 0 ? '请先从右侧选择一名待安排学生' : '当前没有待安排学生')
+  }
+
+  function beginStudentMove(student: StudentRecord): void {
+    setSelectedStudentId(student.id)
+    setOpenStudent(null)
+    setStatus(`已选择 ${student.name}，请点击目标座位`)
   }
 
   function deskStudents(seatIds: string[]): Array<StudentRecord | undefined> {
@@ -335,7 +354,7 @@ function App({ repository = classRepository }: { repository?: ClassRepository })
           {classes.map((classroom) => {
             const isActive = selectedClassId === classroom.id
             return (
-              <button type="button" key={classroom.id} aria-current={isActive ? 'page' : undefined} className={`class-item ${isActive ? 'is-active' : ''}`} onClick={() => { setSelectedClassId(classroom.id); setSelectedStudentId(undefined); setOpenStudent(null) }}>
+              <button type="button" key={classroom.id} aria-current={isActive ? 'page' : undefined} className={`class-item ${isActive ? 'is-active' : ''}`} onClick={() => { resetWorkspace(); setSelectedClassId(classroom.id) }}>
                 <span className="class-avatar" aria-hidden="true">{classroom.grade.slice(0, 2) || '班'}</span>
                 <span className="class-item__copy"><strong>{classroom.name}</strong><small>{isActive ? `${students.length} 名学生` : classroom.academicYear || '本地班级'}</small></span>
                 {isActive && <Check size={15} aria-label="当前班级" />}
@@ -429,7 +448,7 @@ function App({ repository = classRepository }: { repository?: ClassRepository })
           </aside>
         </div>
 
-        {openStudent && <ProfileDrawer student={openStudent} onClose={() => setOpenStudent(null)} />}
+        {openStudent && <ProfileDrawer student={openStudent} onClose={() => setOpenStudent(null)} onBeginMove={beginStudentMove} />}
       </section>
       {showCreateDialog && (
         <div className="modal-backdrop" role="presentation" onMouseDown={(event) => {
