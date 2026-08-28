@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import {
   AlertTriangle,
   ArrowRight,
@@ -82,7 +82,7 @@ export function StudentSeat({ student, onActivate }: { student?: StudentRecord; 
   )
 }
 
-export function ClassroomDesk({ label, seatIds, students, capacity = 2, editing = false, onSeatActivate, className = '' }: {
+export function ClassroomDesk({ label, seatIds, students, capacity = 2, editing = false, onSeatActivate, className = '', style }: {
   label: string
   seatIds: string[]
   students: Array<StudentRecord | undefined>
@@ -90,9 +90,10 @@ export function ClassroomDesk({ label, seatIds, students, capacity = 2, editing 
   editing?: boolean
   onSeatActivate: (seatId: string, student?: StudentRecord) => void
   className?: string
+  style?: CSSProperties
 }) {
   return (
-    <section className={`classroom-desk capacity-${capacity} ${editing ? 'is-editing' : ''} ${className}`} aria-label={`${label}，${capacity === 1 ? '单人桌' : '双人桌'}`}>
+    <section className={`classroom-desk capacity-${capacity} ${editing ? 'is-editing' : ''} ${className}`} style={style} aria-label={`${label}，${capacity === 1 ? '单人桌' : '双人桌'}`}>
       <span className="classroom-desk__label">{label}</span>
       {editing && <Move className="classroom-desk__move" size={15} aria-label="可移动桌子" />}
       <div className="classroom-desk__surface">

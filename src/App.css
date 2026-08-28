@@ -156,13 +156,13 @@ button { border: 0; cursor: pointer; }
 
 .canvas-viewport {
   min-width: 0; min-height: 0; overflow: auto; overscroll-behavior: contain;
-  display: grid; align-items: start; justify-items: center; padding: 18px;
+  display: grid; align-items: start; justify-items: center; padding: 12px;
   background: #e8eef3; border: 1px solid #d2dce4; border-radius: var(--radius-md);
   scrollbar-color: #adbac5 transparent;
 }
 .classroom-stage-sizer { position: relative; flex: 0 0 auto; }
 .classroom-stage {
-  position: absolute; inset: 0 auto auto 0; width: 920px; height: 610px; overflow: hidden;
+  position: absolute; inset: 0 auto auto 0; width: var(--stage-width, 920px); height: var(--stage-height, 610px); overflow: hidden;
   transform: scale(var(--canvas-scale)); transform-origin: top left; color: var(--color-ink-strong);
   background-color: var(--color-canvas);
   background-image: linear-gradient(rgb(215 225 233 / 67%) 1px, transparent 1px), linear-gradient(90deg, rgb(215 225 233 / 67%) 1px, transparent 1px);
@@ -190,7 +190,7 @@ button { border: 0; cursor: pointer; }
 .podium small { margin-top: 3px; color: var(--color-ink-faint); font-size: 7px; font-weight: 700; letter-spacing: 2.2px; }
 .desk-grid {
   position: absolute; top: 158px; right: 55px; left: 55px; display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: repeat(2, 128px); gap: 58px 46px;
+  gap: 58px 46px;
 }
 .classroom-desk { position: relative; min-width: 0; transition: transform 140ms ease; }
 .classroom-desk__surface {
@@ -233,9 +233,7 @@ button { border: 0; cursor: pointer; }
 }
 .capacity-1 { width: 112px; height: 88px; }
 .capacity-1 .classroom-desk__surface { grid-template-columns: 1fr; }
-.special-desk { position: absolute; top: 49px; }
-.special-desk-left { left: 62px; }
-.special-desk-right { right: 62px; }
+.special-desk { position: absolute; }
 .special-desk .classroom-desk__label { top: -14px; }
 .special-desk .classroom-desk__move { top: -18px; }
 .canvas-legend {
@@ -464,9 +462,9 @@ button { border: 0; cursor: pointer; }
     width: auto; height: auto; min-height: 0; display: block; padding: 0;
     overflow: visible; background: #fff; border: 0; box-shadow: none;
   }
-  .classroom-stage-sizer { width: 277mm !important; height: 183.5mm !important; }
+  .classroom-stage-sizer { width: var(--print-stage-width) !important; height: var(--print-stage-height) !important; }
   .classroom-stage {
-    width: 920px; height: 610px; transform: scale(1.137); transform-origin: top left;
+    width: var(--stage-width, 920px); height: var(--stage-height, 610px); transform: scale(var(--print-stage-scale, 1.137)); transform-origin: top left;
     border: 1px solid #aebbc6; border-radius: 0; box-shadow: none;
     print-color-adjust: exact; -webkit-print-color-adjust: exact;
   }

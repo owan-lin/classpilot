@@ -55,6 +55,17 @@ function currentAcademicYear(): string {
   return `${startYear}–${startYear + 1}`
 }
 
+function spreadsheetLabel(index: number): string {
+  let value = index + 1
+  let label = ''
+  while (value > 0) {
+    const remainder = (value - 1) % 26
+    label = String.fromCharCode(65 + remainder) + label
+    value = Math.floor((value - 1) / 26)
+  }
+  return label
+}
+
 function App({ repository = classRepository }: { repository?: ClassRepository }) {
   const [mode, setMode] = useState<'arrange' | 'layout'>('arrange')
   const [classes, setClasses] = useState<ClassRecord[]>([])
@@ -96,6 +107,18 @@ function App({ repository = classRepository }: { repository?: ClassRepository })
     })
     return () => { active = false }
   }, [repository, dataRevision])
+
+  useEffect(() => {
+    if (!showCreateDialog && !showSettingsDialog) return
+
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      setShowCreateDialog(false)
+      setShowSettingsDialog(false)
+    }
+    window.addEventListener('keydown', closeOnEscape)
+    return () => window.removeEventListener('keydown', closeOnEscape)
+  }, [showCreateDialog, showSettingsDialog])
 
   useEffect(() => {
     if (!selectedClassId) return
@@ -155,10 +178,40 @@ function App({ repository = classRepository }: { repository?: ClassRepository })
     )
   }, [searchQuery, studentPool])
   const seatingWarnings = useMemo(() => draft ? getSeatingWarnings(draft, students) : [], [draft, students])
-  const regularDesks = draft?.desks.filter(({ kind }) => kind === 'regular') ?? []
-  const specialDesks = draft?.desks.filter(({ kind }) => kind === 'special') ?? []
+  const regularDesks = useMemo(() => draft?.desks.filter(({ kind }) => kind === 'regular') ?? [], [draft])
+  const specialDesks = useMemo(() => draft?.desks.filter(({ kind }) => kind === 'special') ?? [], [draft])
+  const canvasLayout = useMemo(() => {
+    const columnCoordinates = [...new Set(regularDesks.map(({ x }) => x))].sort((first, second) => first - second)
+    const rowCoordinates = [...new Set(regularDesks.map(({ y }) => y))].sort((first, second) => first - second)
+    const columns = Math.max(columnCoordinates.length, 1)
+    const rows = Math.max(rowCoordinates.length, 1)
+    const stageWidth = Math.max(canvasWidth, 250 + columns * 190 + Math.max(columns - 1, 0) * 46)
+    const stageHeight = Math.max(canvasHeight, 278 + rows * 128 + Math.max(rows - 1, 0) * 58)
+    const printScale = Math.min(1046 / stageWidth, 694 / stageHeight)
+    return {
+      columns,
+      rows,
+      columnCoordinates,
+      rowCoordinates,
+      regularDesks: [...regularDesks].sort((first, second) => first.y - second.y || first.x - second.x),
+      stageWidth,
+      stageHeight,
+      printScale,
+    }
+  }, [regularDesks])
   const canvasScale = zoom / 100
-  const scaleStyle = { '--canvas-scale': canvasScale } as CSSProperties
+  const stageStyle = {
+    '--canvas-scale': canvasScale,
+    '--stage-width': `${canvasLayout.stageWidth}px`,
+    '--stage-height': `${canvasLayout.stageHeight}px`,
+    '--print-stage-width': `${canvasLayout.stageWidth * canvasLayout.printScale}px`,
+    '--print-stage-height': `${canvasLayout.stageHeight * canvasLayout.printScale}px`,
+    '--print-stage-scale': canvasLayout.printScale,
+  } as CSSProperties
+  const deskGridStyle = {
+    gridTemplateColumns: `repeat(${canvasLayout.columns}, minmax(160px, 1fr))`,
+    gridTemplateRows: `repeat(${canvasLayout.rows}, 128px)`,
+  } as CSSProperties
 
   function resetWorkspace(): void {
     setStudents([])
@@ -432,16 +485,20 @@ function App({ repository = classRepository }: { repository?: ClassRepository })
               {!selectedClass ? (
                 <EmptyState title="先创建一个班级" description="所有数据只会保存在这台设备上。" action={<button type="button" className="button-primary" onClick={() => setShowCreateDialog(true)}>新建班级</button>} />
               ) : (
-                <div className="classroom-stage-sizer" style={{ width: canvasWidth * canvasScale, height: canvasHeight * canvasScale, ...scaleStyle }}>
-                  <section className={`classroom-stage mode-${mode}`} aria-label={`${selectedClass.name} 座位表`}>
+                <div className="classroom-stage-sizer" style={{ width: canvasLayout.stageWidth * canvasScale, height: canvasLayout.stageHeight * canvasScale, ...stageStyle }}>
+                  <section className={`classroom-stage mode-${mode}`} style={stageStyle} aria-label={`${selectedClass.name} 座位表`}>
                     <div className="classroom-front"><span>教室前方</span></div>
                     <div className="podium" aria-label="讲台"><span>讲 台</span><small>TEACHER</small></div>
 
-                    {specialDesks.slice(0, 2).map((desk, index) => (
-                      <ClassroomDesk key={desk.id} className={`special-desk special-desk-${index === 0 ? 'left' : 'right'}`} label={`S${index + 1}`} seatIds={desk.seatIds} capacity={desk.capacity} students={deskStudents(desk.seatIds)} editing={mode === 'layout'} onSeatActivate={activateSeat} />
+                    {specialDesks.map((desk, index) => (
+                      <ClassroomDesk key={desk.id} className="special-desk" label={`S${index + 1}`} seatIds={desk.seatIds} capacity={desk.capacity} students={deskStudents(desk.seatIds)} editing={mode === 'layout'} onSeatActivate={activateSeat} style={{ left: desk.x, top: desk.y, width: desk.width, height: desk.height }} />
                     ))}
-                    <div className="desk-grid">
-                      {regularDesks.map((desk, index) => <ClassroomDesk key={desk.id} label={`${String.fromCharCode(65 + Math.floor(index / 3))}${(index % 3) + 1}`} seatIds={desk.seatIds} capacity={desk.capacity} students={deskStudents(desk.seatIds)} editing={mode === 'layout'} onSeatActivate={activateSeat} />)}
+                    <div className="desk-grid" style={deskGridStyle}>
+                      {canvasLayout.regularDesks.map((desk) => {
+                        const rowIndex = canvasLayout.rowCoordinates.indexOf(desk.y)
+                        const columnIndex = canvasLayout.columnCoordinates.indexOf(desk.x)
+                        return <ClassroomDesk key={desk.id} label={`${spreadsheetLabel(rowIndex)}${columnIndex + 1}`} seatIds={desk.seatIds} capacity={desk.capacity} students={deskStudents(desk.seatIds)} editing={mode === 'layout'} onSeatActivate={activateSeat} style={{ gridColumn: columnIndex + 1, gridRow: rowIndex + 1 }} />
+                      })}
                     </div>
                     <div className="classroom-back"><span>教室后方</span></div>
                     <div className="canvas-legend" aria-label="学生卡图例">
