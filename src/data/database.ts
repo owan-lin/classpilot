@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie'
-import type { ClassRecord, LayoutDraft, SeatingSnapshot, StudentRecord } from '../domain/types'
+import type { ClassRecord, LayoutDraft, StudentRecord } from '../domain/types'
 
 export interface DatabaseMetadata {
   key: string
@@ -7,13 +7,12 @@ export interface DatabaseMetadata {
 }
 
 export const DATABASE_NAME = 'classpilot'
-export const DATABASE_SCHEMA_VERSION = 2
+export const DATABASE_SCHEMA_VERSION = 3
 
 export class ClassPilotDatabase extends Dexie {
   classes!: EntityTable<ClassRecord, 'id'>
   students!: EntityTable<StudentRecord, 'id'>
   drafts!: EntityTable<LayoutDraft, 'id'>
-  snapshots!: EntityTable<SeatingSnapshot, 'id'>
   metadata!: EntityTable<DatabaseMetadata, 'key'>
 
   constructor(name = DATABASE_NAME) {
@@ -26,7 +25,7 @@ export class ClassPilotDatabase extends Dexie {
       snapshots: 'id, classId, effectiveAt, createdAt',
     })
 
-    this.version(DATABASE_SCHEMA_VERSION)
+    this.version(2)
       .stores({
         classes: 'id, archived, updatedAt',
         students: 'id, classId, [classId+studentNo], archived, updatedAt',
@@ -57,5 +56,15 @@ export class ClassPilotDatabase extends Dexie {
           value: new Date().toISOString(),
         })
       })
+
+    // Historical snapshots were never part of the core classroom workflow.
+    // Drop the legacy object store while preserving classes, students and drafts.
+    this.version(DATABASE_SCHEMA_VERSION).stores({
+      classes: 'id, archived, updatedAt',
+      students: 'id, classId, [classId+studentNo], archived, updatedAt',
+      drafts: 'id, &classId, updatedAt',
+      snapshots: null,
+      metadata: 'key',
+    })
   }
 }

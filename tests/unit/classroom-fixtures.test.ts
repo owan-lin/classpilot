@@ -1,7 +1,6 @@
 import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
 import {
-  backupDataArbitrary,
   duplicateStudentNumberRoster,
   emptySeatingScenarioArbitrary,
   insufficientSeatingScenarioArbitrary,
@@ -45,17 +44,4 @@ describe('fictional classroom arbitraries', () => {
     }), { numRuns: 100 })
   })
 
-  it('generates self-consistent full backup data with fictional records', () => {
-    fc.assert(fc.property(backupDataArbitrary, (data) => {
-      const classIds = new Set(data.classes.map(({ id }) => id))
-      const studentIds = new Set(data.students.map(({ id }) => id))
-
-      expect(data.students.every(({ classId }) => classIds.has(classId))).toBe(true)
-      expect(data.drafts.every(({ classId }) => classIds.has(classId))).toBe(true)
-      expect(data.snapshots.every(({ classId }) => classIds.has(classId))).toBe(true)
-      expect(data.drafts.flatMap(({ assignments }) => assignments)
-        .every(({ studentId }) => studentIds.has(studentId))).toBe(true)
-      expect(data.students.every(({ name }) => name.startsWith('虚构学生'))).toBe(true)
-    }), { numRuns: 100 })
-  })
 })

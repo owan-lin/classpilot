@@ -1,6 +1,5 @@
 import fc from 'fast-check'
 import type {
-  BackupData,
   DeskRecord,
   LayoutDraft,
   SeatAssignment,
@@ -157,30 +156,3 @@ export const duplicateStudentNumberRoster = scenarioArbitrary(
 ).map(({ students }) => students.map((student, index) => (
   index === 1 ? { ...student, studentNo: students[0].studentNo } : student
 )))
-
-export const backupDataArbitrary: fc.Arbitrary<BackupData> = seatingScenarioArbitrary
-  .chain((scenario) => fc.uuid().map((snapshotId) => ({
-    classes: [{
-      id: scenario.draft.classId,
-      name: '虚构测试班级',
-      grade: '测试年级',
-      academicYear: '2026-2027',
-      archived: false,
-      createdAt: testTimestamp,
-      updatedAt: testTimestamp,
-    }],
-    students: scenario.students,
-    drafts: [scenario.draft],
-    snapshots: [{
-      id: snapshotId,
-      classId: scenario.draft.classId,
-      title: '虚构历史版本',
-      effectiveAt: testTimestamp,
-      layout: scenario.draft,
-      studentNames: Object.fromEntries(
-        scenario.students.map((student) => [student.id, student.name]),
-      ),
-      createdAt: testTimestamp,
-      updatedAt: testTimestamp,
-    }],
-  })))

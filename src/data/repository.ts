@@ -1,6 +1,4 @@
 import type {
-  BackupEnvelope,
-  BackupRestoreResult,
   ClassRecord,
   ClassRecordChanges,
   ClassRepository,
@@ -8,12 +6,9 @@ import type {
   LayoutDraft,
   NewClassRecord,
   NewStudentRecord,
-  PublishSnapshotInput,
-  SeatingSnapshot,
   StudentRecord,
   StudentRecordChanges,
 } from '../domain/types'
-import { createBackup, validateAndMigrateBackup } from './backup'
 import { ClassPilotDatabase } from './database'
 
 export interface RepositoryDependencies {
@@ -131,11 +126,10 @@ export class DexieClassRepository implements ClassRepository {
   async deleteClass(id: EntityId): Promise<void> {
     await this.database.transaction(
       'rw',
-      [this.database.classes, this.database.students, this.database.drafts, this.database.snapshots],
+      [this.database.classes, this.database.students, this.database.drafts],
       async () => {
         await this.database.students.where('classId').equals(id).delete()
         await this.database.drafts.where('classId').equals(id).delete()
-        await this.database.snapshots.where('classId').equals(id).delete()
         await this.database.classes.delete(id)
       },
     )
@@ -276,123 +270,6 @@ export class DexieClassRepository implements ClassRepository {
 
   async deleteDraft(classId: EntityId): Promise<void> {
     await this.database.drafts.where('classId').equals(classId).delete()
-  }
-
-  async listSnapshots(classId: EntityId): Promise<SeatingSnapshot[]> {
-    const snapshots = await this.database.snapshots.where('classId').equals(classId).toArray()
-    return clone(snapshots.sort((first, second) => second.effectiveAt.localeCompare(first.effectiveAt)))
-  }
-
-  async publishSnapshot(input: PublishSnapshotInput): Promise<SeatingSnapshot> {
-    return this.database.transaction(
-      'rw',
-      [this.database.drafts, this.database.students, this.database.snapshots],
-      async () => {
-        const draft = await this.database.drafts.where('classId').equals(input.classId).first()
-        if (!draft) throw new Error('尚未创建座位草稿')
-        const students = await this.database.students.where('classId').equals(input.classId).toArray()
-        const timestamp = this.dependencies.now()
-        const assignedIds = new Set(draft.assignments.map(({ studentId }) => studentId))
-        const snapshot: SeatingSnapshot = {
-          id: this.dependencies.createId(),
-          classId: input.classId,
-          title: requireText(input.title, '版本标题'),
-          ...(input.note?.trim() ? { note: input.note.trim() } : {}),
-          effectiveAt: input.effectiveAt ?? timestamp,
-          layout: clone(draft),
-          studentNames: Object.fromEntries(
-            students.filter(({ id }) => assignedIds.has(id)).map(({ id, name }) => [id, name]),
-          ),
-          createdAt: timestamp,
-          updatedAt: timestamp,
-        }
-        await this.database.snapshots.add(snapshot)
-        return clone(snapshot)
-      },
-    )
-  }
-
-  async restoreSnapshot(snapshotId: EntityId): Promise<LayoutDraft> {
-    return this.database.transaction('rw', [
-      this.database.classes,
-      this.database.students,
-      this.database.snapshots,
-      this.database.drafts,
-    ], async () => {
-      const snapshot = await requireRecord(() => this.database.snapshots.get(snapshotId), '历史版本')
-      await requireRecord(() => this.database.classes.get(snapshot.classId), '班级')
-      const activeStudentIds = new Set(
-        (await this.database.students.where('classId').equals(snapshot.classId).toArray())
-          .filter(({ archived }) => !archived)
-          .map(({ id }) => id),
-      )
-      const validSeatIds = new Set(snapshot.layout.desks.flatMap((desk) => desk.seatIds))
-      const assignedSeats = new Set<EntityId>()
-      const assignedStudents = new Set<EntityId>()
-      const assignments = snapshot.layout.assignments.filter((assignment) => {
-        if (!validSeatIds.has(assignment.seatId) || !activeStudentIds.has(assignment.studentId)) return false
-        if (assignedSeats.has(assignment.seatId) || assignedStudents.has(assignment.studentId)) return false
-        assignedSeats.add(assignment.seatId)
-        assignedStudents.add(assignment.studentId)
-        return true
-      })
-      const timestamp = this.dependencies.now()
-      const restored: LayoutDraft = {
-        ...clone(snapshot.layout),
-        id: this.dependencies.createId(),
-        classId: snapshot.classId,
-        assignments,
-        createdAt: timestamp,
-        updatedAt: timestamp,
-      }
-      await this.database.drafts.where('classId').equals(snapshot.classId).delete()
-      await this.database.drafts.add(restored)
-      return clone(restored)
-    })
-  }
-
-  async exportBackup(): Promise<BackupEnvelope> {
-    const [classes, students, drafts, snapshots] = await this.database.transaction(
-      'r',
-      [this.database.classes, this.database.students, this.database.drafts, this.database.snapshots],
-      () => Promise.all([
-        this.database.classes.orderBy('id').toArray(),
-        this.database.students.orderBy('id').toArray(),
-        this.database.drafts.orderBy('id').toArray(),
-        this.database.snapshots.orderBy('id').toArray(),
-      ]),
-    )
-    return createBackup({ classes, students, drafts, snapshots }, this.dependencies.now())
-  }
-
-  async restoreBackup(input: unknown): Promise<BackupRestoreResult> {
-    const { backup, sourceSchemaVersion } = await validateAndMigrateBackup(input)
-    const { classes, students, drafts, snapshots } = backup.data
-    await this.database.transaction(
-      'rw',
-      [this.database.classes, this.database.students, this.database.drafts, this.database.snapshots],
-      async () => {
-        await Promise.all([
-          this.database.classes.clear(),
-          this.database.students.clear(),
-          this.database.drafts.clear(),
-          this.database.snapshots.clear(),
-        ])
-        await this.database.classes.bulkPut(clone(classes))
-        await this.database.students.bulkPut(clone(students))
-        await this.database.drafts.bulkPut(clone(drafts))
-        await this.database.snapshots.bulkPut(clone(snapshots))
-      },
-    )
-    return {
-      sourceSchemaVersion,
-      counts: {
-        classes: classes.length,
-        students: students.length,
-        drafts: drafts.length,
-        snapshots: snapshots.length,
-      },
-    }
   }
 }
 

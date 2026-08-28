@@ -67,43 +67,6 @@ export interface LayoutDraft extends BaseRecord {
   assignments: SeatAssignment[]
 }
 
-export interface SeatingSnapshot extends BaseRecord {
-  classId: EntityId
-  title: string
-  note?: string
-  effectiveAt: ISODateTime
-  layout: LayoutDraft
-  studentNames: Record<EntityId, string>
-}
-
-export interface BackupData {
-  classes: ClassRecord[]
-  students: StudentRecord[]
-  drafts: LayoutDraft[]
-  snapshots: SeatingSnapshot[]
-}
-
-export interface BackupEnvelope {
-  format: 'classpilot-backup'
-  schemaVersion: 2
-  exportedAt: ISODateTime
-  checksum: {
-    algorithm: 'SHA-256'
-    value: string
-  }
-  data: BackupData
-}
-
-export interface BackupRestoreResult {
-  sourceSchemaVersion: 1 | 2
-  counts: {
-    classes: number
-    students: number
-    drafts: number
-    snapshots: number
-  }
-}
-
 export type NewClassRecord = Pick<ClassRecord, 'name' | 'grade' | 'academicYear'> &
   Partial<Pick<ClassRecord, 'archived'>>
 
@@ -115,13 +78,6 @@ export type NewStudentRecord = Omit<StudentRecord, keyof BaseRecord>
 export type StudentRecordChanges = Partial<
   Omit<StudentRecord, keyof BaseRecord | 'classId'>
 >
-
-export interface PublishSnapshotInput {
-  classId: EntityId
-  title: string
-  note?: string
-  effectiveAt?: ISODateTime
-}
 
 /** Persistence boundary used by UI and workflows; callers never access Dexie. */
 export interface ClassRepository {
@@ -140,10 +96,4 @@ export interface ClassRepository {
   getDraft(classId: EntityId): Promise<LayoutDraft | undefined>
   saveDraft(draft: LayoutDraft): Promise<void>
   deleteDraft(classId: EntityId): Promise<void>
-  listSnapshots(classId: EntityId): Promise<SeatingSnapshot[]>
-  publishSnapshot(input: PublishSnapshotInput): Promise<SeatingSnapshot>
-  restoreSnapshot(snapshotId: EntityId): Promise<LayoutDraft>
-
-  exportBackup(): Promise<BackupEnvelope>
-  restoreBackup(backup: unknown): Promise<BackupRestoreResult>
 }
