@@ -109,16 +109,17 @@ function App({ repository = classRepository }: { repository?: ClassRepository })
   }, [repository, dataRevision])
 
   useEffect(() => {
-    if (!showCreateDialog && !showSettingsDialog) return
+    if (!showCreateDialog && !showSettingsDialog && !showHistoryDialog) return
 
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return
       setShowCreateDialog(false)
       setShowSettingsDialog(false)
+      setShowHistoryDialog(false)
     }
     window.addEventListener('keydown', closeOnEscape)
     return () => window.removeEventListener('keydown', closeOnEscape)
-  }, [showCreateDialog, showSettingsDialog])
+  }, [showCreateDialog, showHistoryDialog, showSettingsDialog])
 
   useEffect(() => {
     if (!selectedClassId) return
