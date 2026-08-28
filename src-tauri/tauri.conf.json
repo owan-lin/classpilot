@@ -37,7 +37,7 @@
     "targets": ["nsis"],
     "createUpdaterArtifacts": false,
     "shortDescription": "离线优先的班级座位管理工具",
-    "longDescription": "ClassPilot 在当前设备上管理班级、学生档案、座位草稿和历史版本，不需要云端服务器。",
+    "longDescription": "ClassPilot 在当前设备上新建班级、编辑教室、录入学生并安排座位，不需要云端服务器。",
     "copyright": "Copyright © 2026 Owan Lin",
     "windows": {
       "allowDowngrades": false,
