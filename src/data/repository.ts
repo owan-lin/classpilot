@@ -37,7 +37,7 @@ function requireText(value: string, label: string): string {
 }
 
 export function canonicalStudentNo(studentNo: string): string {
-  return requireText(studentNo, '学号').normalize('NFKC').toLowerCase()
+  return studentNo.trim().normalize('NFKC').toLowerCase()
 }
 
 function uniqueText(values: readonly string[]): string[] {
@@ -47,7 +47,8 @@ function uniqueText(values: readonly string[]): string[] {
 function normalizeStudent(input: NewStudentRecord): NewStudentRecord {
   return {
     ...clone(input),
-    studentNo: requireText(input.studentNo, '学号').normalize('NFKC'),
+    // 学号是辅助识别信息，不是录入学生的前置条件。
+    studentNo: input.studentNo.trim().normalize('NFKC'),
     name: requireText(input.name, '姓名'),
     roles: uniqueText(input.roles),
     characterTags: uniqueText(input.characterTags),
@@ -161,6 +162,7 @@ export class DexieClassRepository implements ClassRepository {
     exceptId?: EntityId,
   ): Promise<void> {
     const normalized = canonicalStudentNo(studentNo)
+    if (!normalized) return
     const classmates = await this.database.students.where('classId').equals(classId).toArray()
     if (classmates.some((student) => student.id !== exceptId && canonicalStudentNo(student.studentNo) === normalized)) {
       throw new Error(`学号 ${studentNo} 已存在`)
