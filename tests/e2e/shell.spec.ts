@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test'
 
+const deploymentBase = process.env.CI ? '/classpilot' : ''
+
 async function createClass(page: import('@playwright/test').Page, name: string) {
   await page.locator('.new-class').click()
   await page.getByRole('textbox', { name: '班级名称' }).fill(name)
@@ -16,7 +18,7 @@ test('creates an empty local class and initializes its seating workspace', async
 })
 
 test('publishes standalone PWA manifest metadata', async ({ request }) => {
-  const response = await request.get('/manifest.webmanifest')
+  const response = await request.get(`${deploymentBase}/manifest.webmanifest`)
   expect(response.ok()).toBe(true)
 
   const manifest = await response.json()
@@ -30,7 +32,7 @@ test('publishes standalone PWA manifest metadata', async ({ request }) => {
     expect.objectContaining({ src: 'icons/192x192.png', sizes: '192x192', purpose: 'any' }),
     expect.objectContaining({ src: 'icons/512x512.png', sizes: '512x512', purpose: 'maskable' }),
   ]))
-  const icon = await request.get('/icons/192x192.png')
+  const icon = await request.get(`${deploymentBase}/icons/192x192.png`)
   expect(icon.ok()).toBe(true)
 })
 
