@@ -8,6 +8,7 @@ import {
   Download,
   FileSpreadsheet,
   History,
+  ImageDown,
   LayoutGrid,
   Minus,
   Plus,
@@ -334,6 +335,26 @@ function App({ repository = classRepository }: { repository?: ClassRepository })
     }
   }
 
+  async function exportSeatMapPng(): Promise<void> {
+    const stage = document.querySelector<HTMLElement>('.classroom-stage')
+    if (!stage || !selectedClass) return
+    try {
+      const { toPng } = await import('html-to-image')
+      const dataUrl = await toPng(stage, {
+        backgroundColor: '#f7fafc',
+        cacheBust: true,
+        pixelRatio: 2,
+      })
+      const anchor = document.createElement('a')
+      anchor.href = dataUrl
+      anchor.download = `${selectedClass.name.replace(/[\\/:*?"<>|]/g, '-')}-座位表.png`
+      anchor.click()
+      setStatus('PNG 座位表已导出')
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'PNG 导出失败')
+    }
+  }
+
   function openFirstWarningStudent(): void {
     const studentId = seatingWarnings[0]?.studentIds[0]
     const student = studentId ? studentsById.get(studentId) : undefined
@@ -383,6 +404,7 @@ function App({ repository = classRepository }: { repository?: ClassRepository })
           </div>
           <div className="toolbar" aria-label="座位表工具">
             <button type="button" className="button-secondary" title={`共 ${snapshots.length} 个历史版本`} onClick={() => setShowHistoryDialog(true)}><History size={16} aria-hidden="true" />历史版本 {snapshots.length || ''}</button>
+            <button type="button" className="button-secondary" disabled={!draft} onClick={() => void exportSeatMapPng()}><ImageDown size={16} aria-hidden="true" />导出 PNG</button>
             <button type="button" className="button-secondary" onClick={() => window.print()}><Printer size={16} aria-hidden="true" />打印 / PDF</button>
             <button type="button" className="button-primary publish-button" disabled={!draft} onClick={() => void publishSnapshot()}><Sparkles size={16} aria-hidden="true" />启用此座位表</button>
           </div>
