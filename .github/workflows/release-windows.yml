@@ -27,6 +27,13 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'ClassPilot ${{ github.ref_name }}'
-          releaseBody: 'Windows 安装包与更新说明。ClassPilot 的学生数据始终保存在用户本机。'
+          releaseBody: 'Windows 安装版与免安装版。下载 ClassPilot-Windows-Portable.exe 后双击即可直接运行；学生数据始终保存在用户本机。'
           releaseDraft: true
           prerelease: false
+      - name: Upload one-click portable app
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          Copy-Item 'src-tauri\target\release\classpilot.exe' 'ClassPilot-Windows-Portable.exe'
+          gh release upload '${{ github.ref_name }}' 'ClassPilot-Windows-Portable.exe#ClassPilot 免安装版（双击直接运行）' --clobber
