@@ -11,6 +11,7 @@ import {
   LayoutGrid,
   Minus,
   Plus,
+  Printer,
   Redo2,
   Search,
   Settings,
@@ -20,7 +21,7 @@ import {
 } from 'lucide-react'
 import { classRepository } from './data/repository'
 import { generateDeskGrid, getSeatingWarnings, getStudentPool, placeStudent } from './domain/seating'
-import type { ClassRecord, ClassRepository, LayoutDraft, StudentRecord } from './domain/types'
+import type { ClassRecord, ClassRepository, LayoutDraft, SeatingSnapshot, StudentRecord } from './domain/types'
 import { createBackupDownload, restoreBackupText } from './features/backup/backupTransfer'
 import { createDefaultDraft } from './features/drafts/createDraft'
 import { DraftSession } from './features/drafts/draftSession'
@@ -59,7 +60,7 @@ function App({ repository = classRepository }: { repository?: ClassRepository })
   const [selectedClassId, setSelectedClassId] = useState<string>()
   const [students, setStudents] = useState<StudentRecord[]>([])
   const [draft, setDraft] = useState<LayoutDraft>()
-  const [snapshotCount, setSnapshotCount] = useState(0)
+  const [snapshots, setSnapshots] = useState<SeatingSnapshot[]>([])
   const [canUndo, setCanUndo] = useState(false)
   const [canRedo, setCanRedo] = useState(false)
   const [selectedStudentId, setSelectedStudentId] = useState<string>()
@@ -69,6 +70,7 @@ function App({ repository = classRepository }: { repository?: ClassRepository })
   const [status, setStatus] = useState('学生资料仅保存在此设备')
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [showSettingsDialog, setShowSettingsDialog] = useState(false)
+  const [showHistoryDialog, setShowHistoryDialog] = useState(false)
   const [dataRevision, setDataRevision] = useState(0)
   const [newClassSetup, setNewClassSetup] = useState<NewClassSetup>({
     name: '',
@@ -109,7 +111,7 @@ function App({ repository = classRepository }: { repository?: ClassRepository })
       if (!storedDraft) await repository.saveDraft(nextDraft)
       if (!active) return
       setStudents(nextStudents)
-      setSnapshotCount(snapshots.length)
+      setSnapshots(snapshots)
       session = new DraftSession(nextDraft, repository)
       sessionRef.current = session
       unsubscribe = session.subscribe((history) => {
@@ -291,14 +293,25 @@ function App({ repository = classRepository }: { repository?: ClassRepository })
     if (!selectedClassId || !draft) return
     try {
       await sessionRef.current?.flush()
-      await repository.publishSnapshot({
+      const snapshot = await repository.publishSnapshot({
         classId: selectedClassId,
         title: `${new Date().toLocaleDateString('zh-CN')} 座位表`,
       })
-      setSnapshotCount((count) => count + 1)
+      setSnapshots((current) => [snapshot, ...current])
       setStatus('当前座位表已保存为不可变历史版本')
     } catch (error) {
       setStatus(error instanceof Error ? error.message : '启用座位表失败')
+    }
+  }
+
+  async function restoreSnapshot(snapshotId: string): Promise<void> {
+    try {
+      await repository.restoreSnapshot(snapshotId)
+      setDataRevision((value) => value + 1)
+      setShowHistoryDialog(false)
+      setStatus('历史版本已恢复为新的座位草稿，原历史记录保持不变')
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : '历史版本恢复失败')
     }
   }
 
@@ -350,7 +363,8 @@ function App({ repository = classRepository }: { repository?: ClassRepository })
             <p><span>{selectedClass?.academicYear || '—'} 学年</span><span className="save-status"><Check size={12} aria-hidden="true" />本地自动保存</span></p>
           </div>
           <div className="toolbar" aria-label="座位表工具">
-            <button type="button" className="button-secondary" title={`共 ${snapshotCount} 个历史版本`}><History size={16} aria-hidden="true" />历史版本 {snapshotCount || ''}</button>
+            <button type="button" className="button-secondary" title={`共 ${snapshots.length} 个历史版本`} onClick={() => setShowHistoryDialog(true)}><History size={16} aria-hidden="true" />历史版本 {snapshots.length || ''}</button>
+            <button type="button" className="button-secondary" onClick={() => window.print()}><Printer size={16} aria-hidden="true" />打印 / PDF</button>
             <button type="button" className="button-primary publish-button" disabled={!draft} onClick={() => void publishSnapshot()}><Sparkles size={16} aria-hidden="true" />启用此座位表</button>
           </div>
         </header>
@@ -453,6 +467,25 @@ function App({ repository = classRepository }: { repository?: ClassRepository })
             </div>
             <p className="privacy-warning">完整备份可能含联系电话和住址，请勿上传到公开网盘、Issue 或 GitHub。</p>
             <footer><button type="button" className="button-primary" onClick={() => setShowSettingsDialog(false)}>完成</button></footer>
+          </section>
+        </div>
+      )}
+      {showHistoryDialog && (
+        <div className="modal-backdrop" role="presentation" onMouseDown={(event) => {
+          if (event.target === event.currentTarget) setShowHistoryDialog(false)
+        }}>
+          <section className="setup-dialog history-dialog" role="dialog" aria-modal="true" aria-labelledby="history-title">
+            <header><div><span>{selectedClass?.name ?? '当前班级'}</span><strong id="history-title">座位历史版本</strong></div><button type="button" className="icon-button" aria-label="关闭" onClick={() => setShowHistoryDialog(false)}>×</button></header>
+            <div className="history-list">
+              {snapshots.map((snapshot) => (
+                <article key={snapshot.id}>
+                  <div><strong>{snapshot.title}</strong><span>{new Date(snapshot.effectiveAt).toLocaleString('zh-CN')} · {snapshot.layout.assignments.length} 名学生</span></div>
+                  <button type="button" className="button-secondary" onClick={() => void restoreSnapshot(snapshot.id)}>恢复为草稿</button>
+                </article>
+              ))}
+              {snapshots.length === 0 && <EmptyState title="还没有历史版本" description="点击“启用此座位表”后，会在这里保留一份不可变快照。" />}
+            </div>
+            <footer><button type="button" className="button-primary" onClick={() => setShowHistoryDialog(false)}>完成</button></footer>
           </section>
         </div>
       )}
