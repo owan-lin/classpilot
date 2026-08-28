@@ -65,5 +65,3 @@ test('restores a published history snapshot into a new draft', async ({ page }) 
   await expect(page.getByText('历史版本已恢复为新的座位草稿，原历史记录保持不变')).toBeVisible()
 })
 
-test.fixme('imports a roster and shows duplicate-number resolution in the UI', async () => {})
-test.fixme('exports a PWA backup and restores it through the Tauri UI', async () => {})
