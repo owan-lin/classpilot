@@ -1,6 +1,6 @@
 [package]
 name = "classpilot"
-version = "0.2.2"
+version = "0.2.3"
 description = "ClassPilot offline-first classroom seating manager"
 authors = ["Owan Lin"]
 edition = "2021"
