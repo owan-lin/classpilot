@@ -1,6 +1,6 @@
 [package]
 name = "classpilot"
-version = "0.2.4"
+version = "0.2.5"
 description = "ClassPilot offline-first classroom seating manager"
 authors = ["Owan Lin"]
 edition = "2021"
@@ -16,3 +16,10 @@ tauri-build = { version = "2", features = [] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tauri = { version = "2", features = [] }
+
+[target.'cfg(windows)'.dependencies]
+# Keep this pinned to Tauri/wry's current WebView2 COM binding.  The desktop
+# migration needs Profile2's selective cache-clearing API, not a broad profile
+# reset that would erase local classroom data.
+webview2-com = "=0.38.2"
+windows-core = "=0.61.2"

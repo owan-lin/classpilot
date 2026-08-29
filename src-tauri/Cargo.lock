@@ -323,12 +323,14 @@ dependencies = [
 
 [[package]]
 name = "classpilot"
-version = "0.2.4"
+version = "0.2.5"
 dependencies = [
  "serde",
  "serde_json",
  "tauri",
  "tauri-build",
+ "webview2-com",
+ "windows-core 0.61.2",
 ]
 
 [[package]]

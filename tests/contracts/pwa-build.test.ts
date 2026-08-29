@@ -24,25 +24,21 @@ function buildWithEnvironment(tauri: boolean): string {
 }
 
 describe('PWA build isolation', () => {
-  it('installs document-start desktop cleanup without touching IndexedDB', () => {
+  it('uses native WebView2 selective cleanup without touching local student storage', () => {
     const source = readFileSync(join(process.cwd(), 'src-tauri/src/lib.rs'), 'utf8')
-    expect(source).toContain('append_invoke_initialization_script')
-    expect(source).toContain('serviceWorker')
-    expect(source).toContain('caches.delete')
-    expect(source).toContain('restart_after_cache_cleanup')
-    expect(source).toContain('app.restart()')
-    expect(source).toContain('classpilot:desktop-cache-cleanup-v4')
-    expect(source).toContain('classpilot:desktop-cache-attempted-v4')
-    expect(source).not.toContain('classpilot:desktop-cache-cleanup-v3')
-    expect(source).not.toContain('location.reload')
-    expect(source).not.toMatch(/indexedDB\.deleteDatabase|clear_all_browsing_data/)
-    expect(source.indexOf('localStorage.setItem(durableMarker')).toBeGreaterThan(source.indexOf('await Promise.all(registrations'))
-    expect(source).toContain('sessionStorage')
+    expect(source).toContain('ClearBrowsingData(')
+    expect(source).toContain('COREWEBVIEW2_BROWSING_DATA_KINDS_DISK_CACHE')
+    expect(source).toContain('COREWEBVIEW2_BROWSING_DATA_KINDS_SERVICE_WORKERS')
+    expect(source).toContain('COREWEBVIEW2_BROWSING_DATA_KINDS_CACHE_STORAGE')
+    expect(source).toContain('desktop-webview-cache-cleanup-v5.marker')
+    expect(source).toContain('callback_handle.restart()')
+    expect(source).not.toMatch(/indexedDB\.deleteDatabase|clear_all_browsing_data|ALL_DOM_STORAGE|ALL_SITE|ALL_PROFILE|LOCAL_STORAGE/)
+    expect(source.indexOf('fs::write(&callback_marker')).toBeLessThan(source.indexOf('callback_handle.restart()'))
   })
 
   it('uses a versioned same-origin window entry without moving storage origins', () => {
     const config = readFileSync(join(process.cwd(), 'src-tauri/tauri.conf.json'), 'utf8')
-    expect(config).toContain('"url": "index.html?v=0.2.4"')
+    expect(config).toContain('"url": "index.html?v=0.2.5"')
     expect(config).not.toContain('useHttpsScheme')
   })
 
@@ -63,6 +59,14 @@ describe('PWA build isolation', () => {
       const index = readFileSync(join(output, 'index.html'), 'utf8')
       expect(index).not.toMatch(/registerSW|serviceWorker|manifest\.webmanifest/i)
       expect(readdirSync(output)).not.toEqual(expect.arrayContaining(['manifest.webmanifest', 'sw.js', 'registerSW.js']))
+      const entry = readdirSync(join(output, 'assets')).find((file) => /^index-.*\.js$/.test(file))
+      expect(entry).toBeDefined()
+      const frontend = readFileSync(join(output, 'assets', entry!), 'utf8')
+      expect(frontend).toContain('录入学生')
+      expect(frontend).toContain('排座 / 移位')
+      expect(frontend).not.toContain('历史版本')
+      expect(frontend).not.toContain('导出 PNG')
+      expect(frontend).not.toContain('打印 PDF')
     } finally {
       rmSync(output, { recursive: true, force: true })
     }
