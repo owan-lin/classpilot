@@ -31,13 +31,19 @@ describe('PWA build isolation', () => {
     expect(source).toContain('caches.delete')
     expect(source).toContain('restart_after_cache_cleanup')
     expect(source).toContain('app.restart()')
-    expect(source).toContain('classpilot:desktop-cache-cleanup-v3')
-    expect(source).toContain('classpilot:desktop-cache-attempted-v3')
-    expect(source).not.toContain('classpilot:desktop-cache-cleanup-v2')
+    expect(source).toContain('classpilot:desktop-cache-cleanup-v4')
+    expect(source).toContain('classpilot:desktop-cache-attempted-v4')
+    expect(source).not.toContain('classpilot:desktop-cache-cleanup-v3')
     expect(source).not.toContain('location.reload')
     expect(source).not.toMatch(/indexedDB\.deleteDatabase|clear_all_browsing_data/)
     expect(source.indexOf('localStorage.setItem(durableMarker')).toBeGreaterThan(source.indexOf('await Promise.all(registrations'))
     expect(source).toContain('sessionStorage')
+  })
+
+  it('uses a versioned same-origin window entry without moving storage origins', () => {
+    const config = readFileSync(join(process.cwd(), 'src-tauri/tauri.conf.json'), 'utf8')
+    expect(config).toContain('"url": "index.html?v=0.2.4"')
+    expect(config).not.toContain('useHttpsScheme')
   })
 
   it('keeps the web PWA integration', () => {

@@ -15,8 +15,8 @@ fn restart_after_cache_cleanup(app: tauri::AppHandle) {
 /// Runs before document parsing so a stale web service worker cannot serve the old app shell.
 /// IndexedDB is intentionally untouched; the marker prevents a reload loop.
 const DESKTOP_CACHE_CLEANUP_SCRIPT: &str = r#"(() => {
-  const durableMarker = 'classpilot:desktop-cache-cleanup-v3';
-  const attemptedMarker = 'classpilot:desktop-cache-attempted-v3';
+  const durableMarker = 'classpilot:desktop-cache-cleanup-v4';
+  const attemptedMarker = 'classpilot:desktop-cache-attempted-v4';
   let durable = false;
   try { durable = localStorage.getItem(durableMarker) === '1'; } catch (_) {}
   if (durable) { try { sessionStorage.removeItem(attemptedMarker); } catch (_) {} return; }
