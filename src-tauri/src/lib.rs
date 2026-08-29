@@ -59,7 +59,7 @@ fn schedule_desktop_cache_cleanup(app: &tauri::App) {
     let _ = main_window.with_webview(move |webview| {
         let callback_handle = app_handle.clone();
         let callback_marker = marker.clone();
-        let result = unsafe {
+        let result: windows_core::Result<()> = (|| unsafe {
             let core = webview.controller().CoreWebView2()?;
             let profile = core
                 .cast::<ICoreWebView2_13>()?
@@ -86,8 +86,9 @@ fn schedule_desktop_cache_cleanup(app: &tauri::App) {
                     }
                     Ok(())
                 })),
-            )
-        };
+            )?;
+            Ok(())
+        })();
         if let Err(error) = result {
             eprintln!("ClassPilot: unable to schedule selective WebView2 cache cleanup: {error}");
         }
