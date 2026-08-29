@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie'
-import type { ClassRecord, LayoutDraft, StudentRecord } from '../domain/types'
+import type { ClassRecord, GradeRecord, LayoutDraft, StudentRecord } from '../domain/types'
 
 export interface DatabaseMetadata {
   key: string
@@ -7,12 +7,13 @@ export interface DatabaseMetadata {
 }
 
 export const DATABASE_NAME = 'classpilot'
-export const DATABASE_SCHEMA_VERSION = 3
+export const DATABASE_SCHEMA_VERSION = 4
 
 export class ClassPilotDatabase extends Dexie {
   classes!: EntityTable<ClassRecord, 'id'>
   students!: EntityTable<StudentRecord, 'id'>
   drafts!: EntityTable<LayoutDraft, 'id'>
+  grades!: EntityTable<GradeRecord, 'id'>
   metadata!: EntityTable<DatabaseMetadata, 'key'>
 
   constructor(name = DATABASE_NAME) {
@@ -66,5 +67,23 @@ export class ClassPilotDatabase extends Dexie {
       snapshots: null,
       metadata: 'key',
     })
+
+    this.version(DATABASE_SCHEMA_VERSION)
+      .stores({
+        classes: 'id, archived, updatedAt',
+        students: 'id, classId, [classId+studentNo], archived, updatedAt',
+        drafts: 'id, &classId, updatedAt',
+        snapshots: null,
+        grades: 'id, classId, studentId, [studentId+subject+examDate], examDate, updatedAt',
+        metadata: 'key',
+      })
+      .upgrade(async (transaction) => {
+        await transaction.table<ClassRecord>('classes').toCollection().modify((classroom) => {
+          classroom.plannedStudentCount ??= 0
+          classroom.rows ??= 2
+          classroom.desksPerRow ??= 3
+          classroom.deskCapacity ??= 2
+        })
+      })
   }
 }

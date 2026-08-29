@@ -77,11 +77,11 @@ afterEach(async () => {
   await Promise.all(databases.splice(0).map((database) => database.delete()))
 })
 
-describe('ClassPilotDatabase v2 to v3 migration', () => {
-  it('preserves core class/student/draft data and removes legacy snapshots store', async () => {
+describe('ClassPilotDatabase v2/v3 to v4 migration', () => {
+  it('preserves core data, adds class defaults and score storage', async () => {
     const name = `classpilot-migration-${crypto.randomUUID()}`
     const classId = 'class-old'
-    const classroom: ClassRecord = {
+    const classroom = {
       id: classId,
       name: '旧版本班级',
       grade: '八年级',
@@ -89,7 +89,7 @@ describe('ClassPilotDatabase v2 to v3 migration', () => {
       archived: false,
       createdAt: timestamp,
       updatedAt: timestamp,
-    }
+    } as unknown as ClassRecord
     const student = oldStudent(classId)
     const draft = oldDraft(classId)
 
@@ -120,14 +120,15 @@ describe('ClassPilotDatabase v2 to v3 migration', () => {
     databases.push(migrated)
     await migrated.open()
 
-    await expect(migrated.classes.get(classId)).resolves.toEqual(classroom)
+    await expect(migrated.classes.get(classId)).resolves.toMatchObject({ ...classroom, plannedStudentCount: 0, rows: 2, desksPerRow: 3, deskCapacity: 2 })
     await expect(migrated.students.get(student.id)).resolves.toEqual(student)
     await expect(migrated.drafts.get(draft.id)).resolves.toEqual(draft)
     await expect(migrated.metadata.get('backup-imported-at')).resolves.toEqual({
       key: 'backup-imported-at',
       value: timestamp,
     })
-    expect(await storeNames(name)).toEqual(expect.arrayContaining(['classes', 'students', 'drafts', 'metadata']))
+    expect(await storeNames(name)).toEqual(expect.arrayContaining(['classes', 'students', 'drafts', 'grades', 'metadata']))
     expect(await storeNames(name)).not.toContain('snapshots')
+    expect(await migrated.grades.toArray()).toEqual([])
   })
 })

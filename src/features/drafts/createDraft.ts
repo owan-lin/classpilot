@@ -1,4 +1,5 @@
 import { generateDeskGrid } from '../../domain/seating'
+import { isRegularGridUsable, regularDeskSpec } from '../../domain/layout'
 import type { EntityId, LayoutDraft } from '../../domain/types'
 
 export interface DraftFactoryDependencies {
@@ -13,8 +14,12 @@ const browserDependencies: DraftFactoryDependencies = {
 
 export function createDefaultDraft(
   classId: EntityId,
+  configuration: { rows?: number; desksPerRow?: number; capacity?: 1 | 2 } = {},
   dependencies: DraftFactoryDependencies = browserDependencies,
 ): LayoutDraft {
+  const rows = configuration.rows ?? 2
+  const desksPerRow = configuration.desksPerRow ?? 3
+  if (!isRegularGridUsable(rows, desksPerRow)) throw new RangeError('普通座位数量超出画布可用范围')
   const timestamp = dependencies.now()
   return {
     id: dependencies.createId(),
@@ -23,13 +28,13 @@ export function createDefaultDraft(
     desks: generateDeskGrid(
       {
         classId,
-        rows: 2,
-        desksPerRow: 3,
-        capacity: 2,
+        rows,
+        desksPerRow,
+        capacity: configuration.capacity ?? regularDeskSpec.capacity,
         originX: 75,
         originY: 145,
-        deskWidth: 190,
-        deskHeight: 112,
+        deskWidth: regularDeskSpec.width,
+        deskHeight: regularDeskSpec.height,
         horizontalGap: 48,
         verticalGap: 62,
       },

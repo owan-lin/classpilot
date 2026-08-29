@@ -42,6 +42,24 @@ afterEach(async () => {
 })
 
 describe('DexieClassRepository', () => {
+  it('stores class layout parameters and validates score records', async () => {
+    const { repository } = createRepository()
+    const classroom = await repository.createClass({ name: '参数班', grade: '七年级', academicYear: '2026', plannedStudentCount: 12, rows: 2, desksPerRow: 3, deskCapacity: 2 })
+    expect(classroom).toMatchObject({ plannedStudentCount: 12, rows: 2, desksPerRow: 3, deskCapacity: 2 })
+    const student = await repository.createStudent(newStudent(classroom.id))
+    await expect(repository.createGrade({ classId: classroom.id, studentId: student.id, subject: '数学', examName: '月考', examDate: '2026-01-01', score: 101, fullScore: 100 })).rejects.toThrow('得分')
+    const grade = await repository.createGrade({ classId: classroom.id, studentId: student.id, subject: '数学', examName: '月考', examDate: '2026-01-01', score: 80, fullScore: 100 })
+    expect(await repository.listGrades(classroom.id, { studentId: student.id })).toEqual([grade])
+  })
+
+  it('imports grades atomically and applies duplicate strategies', async () => {
+    const { repository } = createRepository(); const classroom = await repository.createClass({ name: '导入班', grade: '', academicYear: '' }); const student = await repository.createStudent(newStudent(classroom.id, '01'))
+    const row = { rowNumber: 2, raw: {}, studentNo: '01', errors: [], grade: { subject: '数学', examName: '月考', examDate: '2026-01-01', score: 90, fullScore: 100 } }
+    await expect(repository.importGrades(classroom.id, [row], 'reject')).resolves.toEqual({ created: 1, replaced: 0, skipped: 0 })
+    await expect(repository.importGrades(classroom.id, [row], 'skip')).resolves.toEqual({ created: 0, replaced: 0, skipped: 1 })
+    await expect(repository.importGrades(classroom.id, [{ ...row, grade: { ...row.grade, score: 95 } }], 'replace')).resolves.toEqual({ created: 0, replaced: 1, skipped: 0 })
+    expect((await repository.listGrades(classroom.id))[0]).toMatchObject({ studentId: student.id, score: 95 })
+  })
   it('supports class and student CRUD while rejecting duplicate student numbers', async () => {
     const { repository } = createRepository()
     const classroom = await repository.createClass({ name: '测试班', grade: '八年级', academicYear: '2026-2027' })

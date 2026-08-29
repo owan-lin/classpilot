@@ -38,7 +38,7 @@ describe('PWA build isolation', () => {
 
   it('uses a versioned same-origin window entry without moving storage origins', () => {
     const config = readFileSync(join(process.cwd(), 'src-tauri/tauri.conf.json'), 'utf8')
-    expect(config).toContain('"url": "index.html?v=0.2.5"')
+    expect(config).toContain('"url": "index.html?v=0.3.0"')
     expect(config).not.toContain('useHttpsScheme')
   })
 

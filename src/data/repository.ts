@@ -3,8 +3,13 @@ import type {
   ClassRecordChanges,
   ClassRepository,
   EntityId,
+  GradeImportRow,
+  GradeRecord,
+  GradeRecordChanges,
+  GradeDuplicateStrategy,
   LayoutDraft,
   NewClassRecord,
+  NewGradeRecord,
   NewStudentRecord,
   StudentRecord,
   StudentRecordChanges,
@@ -29,6 +34,25 @@ function requireText(value: string, label: string): string {
   const trimmed = value.trim()
   if (!trimmed) throw new Error(`${label}不能为空`)
   return trimmed
+}
+
+function positiveInteger(value: number, label: string): number {
+  if (!Number.isInteger(value) || value < 0) throw new Error(`${label}必须是非负整数`)
+  return value
+}
+
+function deskCapacity(value: number): 1 | 2 {
+  if (value !== 1 && value !== 2) throw new Error('每桌容量只能为 1 或 2')
+  return value
+}
+
+function validateGrade(input: Omit<NewGradeRecord, 'classId' | 'studentId'>): Omit<NewGradeRecord, 'classId' | 'studentId'> {
+  const subject = requireText(input.subject, '学科')
+  const examName = requireText(input.examName, '考试名称')
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.examDate) || Number.isNaN(Date.parse(`${input.examDate}T00:00:00Z`))) throw new Error('考试日期必须是 ISO 日期')
+  if (!Number.isFinite(input.fullScore) || input.fullScore <= 0) throw new Error('满分必须大于 0')
+  if (!Number.isFinite(input.score) || input.score < 0 || input.score > input.fullScore) throw new Error('得分必须在 0 到满分之间')
+  return { ...input, subject, examName, note: input.note?.trim() || undefined }
 }
 
 export function canonicalStudentNo(studentNo: string): string {
@@ -97,6 +121,10 @@ export class DexieClassRepository implements ClassRepository {
       name: requireText(input.name, '班级名称'),
       grade: input.grade.trim(),
       academicYear: input.academicYear.trim(),
+      plannedStudentCount: positiveInteger(input.plannedStudentCount ?? 0, '计划人数'),
+      rows: positiveInteger(input.rows ?? 2, '排数') || 2,
+      desksPerRow: positiveInteger(input.desksPerRow ?? 3, '每排桌数') || 3,
+      deskCapacity: deskCapacity(input.deskCapacity ?? 2),
       archived: input.archived ?? false,
       createdAt: timestamp,
       updatedAt: timestamp,
@@ -114,6 +142,10 @@ export class DexieClassRepository implements ClassRepository {
         ...(changes.name === undefined ? {} : { name: requireText(changes.name, '班级名称') }),
         ...(changes.grade === undefined ? {} : { grade: changes.grade.trim() }),
         ...(changes.academicYear === undefined ? {} : { academicYear: changes.academicYear.trim() }),
+        ...(changes.plannedStudentCount === undefined ? {} : { plannedStudentCount: positiveInteger(changes.plannedStudentCount, '计划人数') }),
+        ...(changes.rows === undefined ? {} : { rows: positiveInteger(changes.rows, '排数') || 1 }),
+        ...(changes.desksPerRow === undefined ? {} : { desksPerRow: positiveInteger(changes.desksPerRow, '每排桌数') || 1 }),
+        ...(changes.deskCapacity === undefined ? {} : { deskCapacity: deskCapacity(changes.deskCapacity) }),
         id: current.id,
         createdAt: current.createdAt,
         updatedAt: this.dependencies.now(),
@@ -126,10 +158,11 @@ export class DexieClassRepository implements ClassRepository {
   async deleteClass(id: EntityId): Promise<void> {
     await this.database.transaction(
       'rw',
-      [this.database.classes, this.database.students, this.database.drafts],
+      [this.database.classes, this.database.students, this.database.drafts, this.database.grades],
       async () => {
         await this.database.students.where('classId').equals(id).delete()
         await this.database.drafts.where('classId').equals(id).delete()
+        await this.database.grades.where('classId').equals(id).delete()
         await this.database.classes.delete(id)
       },
     )
@@ -208,10 +241,11 @@ export class DexieClassRepository implements ClassRepository {
   }
 
   async deleteStudent(id: EntityId): Promise<void> {
-    await this.database.transaction('rw', [this.database.students, this.database.drafts], async () => {
+    await this.database.transaction('rw', [this.database.students, this.database.drafts, this.database.grades], async () => {
       const student = await this.database.students.get(id)
       if (!student) return
       await this.database.students.delete(id)
+      await this.database.grades.where('studentId').equals(id).delete()
       const draft = await this.database.drafts.where('classId').equals(student.classId).first()
       if (draft?.assignments.some(({ studentId }) => studentId === id)) {
         await this.database.drafts.put({
@@ -270,6 +304,55 @@ export class DexieClassRepository implements ClassRepository {
 
   async deleteDraft(classId: EntityId): Promise<void> {
     await this.database.drafts.where('classId').equals(classId).delete()
+  }
+
+  async listGrades(classId: EntityId, filters: { studentId?: EntityId; subject?: string; examDate?: string } = {}): Promise<GradeRecord[]> {
+    const grades = await this.database.grades.where('classId').equals(classId).toArray()
+    return clone(grades.filter((grade) => (!filters.studentId || grade.studentId === filters.studentId) && (!filters.subject || grade.subject === filters.subject) && (!filters.examDate || grade.examDate === filters.examDate)).sort((a, b) => a.examDate.localeCompare(b.examDate) || a.subject.localeCompare(b.subject) || a.updatedAt.localeCompare(b.updatedAt)))
+  }
+
+  async createGrade(input: NewGradeRecord): Promise<GradeRecord> {
+    return this.database.transaction('rw', [this.database.classes, this.database.students, this.database.grades], async () => {
+      await requireRecord(() => this.database.classes.get(input.classId), '班级')
+      const student = await requireRecord(() => this.database.students.get(input.studentId), '学生')
+      if (student.classId !== input.classId) throw new Error('成绩学生不属于当前班级')
+      const timestamp = this.dependencies.now()
+      const record: GradeRecord = { ...validateGrade(input), classId: input.classId, studentId: input.studentId, id: this.dependencies.createId(), createdAt: timestamp, updatedAt: timestamp }
+      await this.database.grades.add(record)
+      return clone(record)
+    })
+  }
+
+  async updateGrade(id: EntityId, changes: GradeRecordChanges): Promise<GradeRecord> {
+    return this.database.transaction('rw', this.database.grades, async () => {
+      const current = await requireRecord(() => this.database.grades.get(id), '成绩')
+      const next = { ...current, ...validateGrade({ ...current, ...clone(changes) }), id: current.id, classId: current.classId, studentId: current.studentId, createdAt: current.createdAt, updatedAt: this.dependencies.now() }
+      await this.database.grades.put(next)
+      return clone(next)
+    })
+  }
+
+  async deleteGrade(id: EntityId): Promise<void> { await this.database.grades.delete(id) }
+
+  async importGrades(classId: EntityId, rows: readonly GradeImportRow[], strategy: GradeDuplicateStrategy): Promise<{ created: number; replaced: number; skipped: number }> {
+    if (rows.some((row) => row.errors.length || !row.grade || !row.studentNo)) throw new Error('导入预览包含错误行，无法写入')
+    return this.database.transaction('rw', [this.database.classes, this.database.students, this.database.grades], async () => {
+      await requireRecord(() => this.database.classes.get(classId), '班级')
+      const students = await this.database.students.where('classId').equals(classId).toArray()
+      const byNo = new Map(students.map((student) => [canonicalStudentNo(student.studentNo), student]))
+      let created = 0; let replaced = 0; let skipped = 0
+      for (const row of rows) {
+        const student = byNo.get(canonicalStudentNo(row.studentNo!)); const grade = row.grade!
+        if (!student) throw new Error(`第 ${row.rowNumber} 行学号不存在于当前班级`)
+        const duplicate = await this.database.grades.where('[studentId+subject+examDate]').equals([student.id, grade.subject, grade.examDate]).first()
+        if (duplicate && strategy === 'reject') throw new Error(`第 ${row.rowNumber} 行存在重复成绩`)
+        if (duplicate && strategy === 'skip') { skipped += 1; continue }
+        const timestamp = this.dependencies.now()
+        const normalized = validateGrade(grade)
+        if (duplicate) { await this.database.grades.put({ ...duplicate, ...normalized, updatedAt: timestamp }); replaced += 1 } else { await this.database.grades.add({ ...normalized, classId, studentId: student.id, id: this.dependencies.createId(), createdAt: timestamp, updatedAt: timestamp }); created += 1 }
+      }
+      return { created, replaced, skipped }
+    })
   }
 }
 
