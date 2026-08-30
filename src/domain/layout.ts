@@ -58,7 +58,7 @@ export function classroomStageFor(
       ? (configuration.sideDeskCount ?? 0)
       : 0,
   );
-  const wing = regularDeskSpec.width + sideGap;
+  const wing = sideRows > 0 ? regularDeskSpec.width + sideGap : 0;
   const originX = wing + 50,
     originY = 125;
   return {

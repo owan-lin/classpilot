@@ -13,6 +13,7 @@ describe('classroom layout contracts', () => {
   })
 
   it('expands the stage for real classroom grids instead of rejecting valid settings', () => {
+    expect(classroomStageFor({ rows: 2, desksPerRow: 3 }).width).toBe(1000)
     expect(isRegularGridUsable(10, 8)).toBe(true)
     const stage = classroomStageFor({ rows: 10, desksPerRow: 8 })
     expect(stage.width).toBeGreaterThan(classroomStage.width)
@@ -24,6 +25,7 @@ describe('classroom layout contracts', () => {
   it('aligns configured regular desks in the main grid and stable extras in side wings', () => {
     const desks = [...Array.from({ length: 6 }, (_, index) => desk(`regular-${index}`, 0, 0)), { ...desk('special-1', 0, 0), kind: 'special' as const }, { ...desk('special-2', 0, 0), kind: 'special' as const }]
     const stage = classroomStageFor({ rows: 2, desksPerRow: 2, sideDeskCount: 2 })
+    expect(stage.width).toBeGreaterThanOrEqual(classroomStage.width)
     const first = alignedDeskPositions(desks, { rows: 2, desksPerRow: 2 }, stage)
     const second = alignedDeskPositions(desks.map((item, index) => ({ ...item, ...first[index] })), { rows: 2, desksPerRow: 2 }, stage)
     expect(first).toEqual(second)
