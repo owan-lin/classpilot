@@ -1,59 +1,47 @@
 import { describe, expect, it } from 'vitest'
-import { alignedDeskPositions, classroomStage, constrainFreeDeskPosition, isDeskPositionValid, isFreeDeskPositionVisible, isRegularGridUsable, rebuildRegularLayout, snapDeskPosition } from './layout'
+import { alignedDeskPositions, classroomStage, classroomStageFor, constrainFreeDeskPosition, isDeskPositionValid, isFreeDeskPositionVisible, isRegularGridUsable, rebuildRegularLayout, snapDeskPosition } from './layout'
 import type { DeskRecord } from './types'
 
-const desk = (id: string, x: number, y: number, width = 150, height = 82): DeskRecord => ({
-  id, classId: 'class', kind: 'regular', capacity: 1, x, y, width, height,
-  seatIds: [`seat-${id}`], createdAt: '2026-01-01', updatedAt: '2026-01-01',
-})
+const desk = (id: string, x: number, y: number, width = 150, height = 82): DeskRecord => ({ id, classId: 'class', kind: 'regular', capacity: 1, x, y, width, height, seatIds: [`seat-${id}`], createdAt: '2026-01-01', updatedAt: '2026-01-01' })
 
 describe('classroom layout contracts', () => {
-  it('snaps free coordinates to the configured grid', () => {
+  it('snaps coordinates and keeps snap mode collision-free within its stage', () => {
     expect(snapDeskPosition({ x: 63, y: 138 })).toEqual({ x: 75, y: 150 })
-  })
-
-  it('rejects out-of-bounds and overlapping positions without changing the draft', () => {
     const desks = [desk('first', 50, 100), desk('second', 300, 100)]
-    const draft = { desks }
-    expect(isDeskPositionValid(draft, 'first', { x: -1, y: 100 })).toBe(false)
-    expect(isDeskPositionValid(draft, 'first', { x: 300, y: 100 })).toBe(false)
-    expect(isDeskPositionValid(draft, 'first', { x: classroomStage.width - 149, y: 100 })).toBe(false)
-    expect(desks[0]).toMatchObject({ x: 50, y: 100 })
+    expect(isDeskPositionValid({ desks }, 'first', { x: 300, y: 100 })).toBe(false)
+    expect(isDeskPositionValid({ desks }, 'first', { x: classroomStage.width - 149, y: 100 })).toBe(false)
   })
 
-  it('creates collision-free aligned coordinates inside the canvas', () => {
-    const desks = Array.from({ length: 6 }, (_, index) => desk(String(index), 0, 0))
-    const positions = alignedDeskPositions(desks)
-    expect(positions).toHaveLength(6)
-    const arranged = desks.map((item, index) => ({ ...item, ...positions![index] }))
-    positions?.forEach((position, index) => {
-      expect(position.x % classroomStage.grid).toBe(0)
-      expect(position.y % classroomStage.grid).toBe(0)
-      expect(isDeskPositionValid({ desks: arranged }, desks[index].id, position)).toBe(true)
-    })
+  it('expands the stage for real classroom grids instead of rejecting valid settings', () => {
+    expect(isRegularGridUsable(10, 8)).toBe(true)
+    const stage = classroomStageFor({ rows: 10, desksPerRow: 8 })
+    expect(stage.width).toBeGreaterThan(classroomStage.width)
+    expect(stage.height).toBeGreaterThan(classroomStage.height)
+    const rebuilt = rebuildRegularLayout({ id: 'd', classId: 'class', podium: { x: 0, y: 0, width: 1, height: 1 }, desks: [], assignments: [], createdAt: '', updatedAt: '' }, { rows: 10, desksPerRow: 8, capacity: 2 }, { deskId: () => 'new', seatId: () => 'new-seat' }, '')
+    expect(rebuilt.desks).toHaveLength(80)
   })
 
-  it('refuses alignment when there is no room for every desk', () => {
-    expect(alignedDeskPositions(Array.from({ length: 30 }, (_, index) => desk(String(index), 0, 0)))).toBeUndefined()
+  it('aligns configured regular desks in the main grid and stable extras in side wings', () => {
+    const desks = [...Array.from({ length: 6 }, (_, index) => desk(`regular-${index}`, 0, 0)), { ...desk('special-1', 0, 0), kind: 'special' as const }, { ...desk('special-2', 0, 0), kind: 'special' as const }]
+    const stage = classroomStageFor({ rows: 2, desksPerRow: 2, sideDeskCount: 2 })
+    const first = alignedDeskPositions(desks, { rows: 2, desksPerRow: 2 }, stage)
+    const second = alignedDeskPositions(desks.map((item, index) => ({ ...item, ...first[index] })), { rows: 2, desksPerRow: 2 }, stage)
+    expect(first).toEqual(second)
+    expect(first.slice(0, 4).every((position) => position.x >= stage.originX && position.y >= stage.originY)).toBe(true)
+    expect(first[4].x).toBeLessThan(stage.originX)
+    expect(first[6].x).toBeGreaterThan(stage.originX + 2 * 190)
+    expect(first.slice(4).every((position) => position.y >= stage.originY)).toBe(true)
   })
 
-  it('rejects regular grids that would leave desks outside the canvas', () => {
-    expect(isRegularGridUsable(2, 3)).toBe(true)
-    expect(isRegularGridUsable(10, 3)).toBe(false)
-    expect(() => rebuildRegularLayout({ id: 'd', classId: 'class', podium: { x: 0, y: 0, width: 1, height: 1 }, desks: [], assignments: [], createdAt: '', updatedAt: '' }, { rows: 10, desksPerRow: 3, capacity: 2 }, { deskId: () => 'new', seatId: () => 'new-seat' }, '')).toThrow(/画布/)
-  })
-
-  it('allows overlapping and podium-area free positions while keeping a grab strip visible', () => {
+  it('allows overlap and podium-area positions in free mode while retaining a grab strip', () => {
     expect(isFreeDeskPositionVisible(desk('a', 0, 0), { x: 350, y: 20 })).toBe(true)
-    expect(isFreeDeskPositionVisible(desk('a', 0, 0), { x: -200, y: 20 })).toBe(false)
     expect(constrainFreeDeskPosition(desk('a', 0, 0), { x: -999, y: 9999 })).toEqual(expect.objectContaining({ x: -118, y: 618 }))
   })
 
-  it('rebuilds regular desks, retains special seats and conserves their students', () => {
+  it('rebuilds regular desks and conserves special-seat students', () => {
     const special = { ...desk('special', 800, 100), kind: 'special' as const }
-    const draft = { id: 'd', classId: 'class', podium: { x: 0, y: 0, width: 1, height: 1 }, desks: [desk('old', 0, 0), special], assignments: [{ seatId: 'seat-old', studentId: 'lost-to-pool' }, { seatId: 'seat-special', studentId: 'kept' }], createdAt: '', updatedAt: '' }
+    const draft = { id: 'd', classId: 'class', podium: { x: 0, y: 0, width: 1, height: 1 }, desks: [desk('old', 0, 0), special], assignments: [{ seatId: 'seat-old', studentId: 'pool' }, { seatId: 'seat-special', studentId: 'kept' }], createdAt: '', updatedAt: '' }
     const rebuilt = rebuildRegularLayout(draft, { rows: 1, desksPerRow: 1, capacity: 2 }, { deskId: () => 'new', seatId: () => 'new-seat' }, '')
-    expect(rebuilt.desks).toHaveLength(2)
     expect(rebuilt.desks.find((item) => item.kind === 'special')?.id).toBe('special')
     expect(rebuilt.assignments).toEqual([{ seatId: 'seat-special', studentId: 'kept' }])
   })

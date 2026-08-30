@@ -289,7 +289,9 @@ test('自由编辑的 Escape/pointercancel 回滚，删除按钮不启动拖动'
   await page.mouse.move(rollbackBox.x + 80, rollbackBox.y + 50, { steps: 8 })
   await page.keyboard.press('Escape')
   await page.mouse.up()
-  await expect(first).toHaveAttribute('style', rollbackBefore)
+  const rollbackAfter = await first.getAttribute('style')
+  expect(rollbackAfter?.replace(/z-index: \d+;/, '')).toBe(rollbackBefore.replace(/z-index: \d+;/, ''))
+  expect(rollbackAfter).toContain('z-index: 4;')
 
   const cancelBefore = await first.getAttribute('style')
   expect(cancelBefore).not.toBeNull()
@@ -314,10 +316,6 @@ test('删除占座课桌后学生回到待安排区且资料不丢失', async ({
   await emptySeat(page, 1, 1).click()
   await page.getByRole('button', { name: '编辑教室' }).click()
 
-  page.once('dialog', async (dialog) => {
-    expect(dialog.message()).toContain('1 名学生')
-    await dialog.accept()
-  })
   await desk(page, 1).getByRole('button', { name: '删除课桌 1' }).click()
   await expect(page.getByRole('status')).toContainText('回到待安排区')
   await openSeating(page)
