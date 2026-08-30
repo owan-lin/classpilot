@@ -26,6 +26,6 @@ html[data-profile-gender="male"] .profile dl div:first-child dd,html[data-profil
 .canvas:before{display:none}.canvas>.podium{position:absolute;z-index:1;top:22px;left:50%;width:clamp(160px,24%,220px);height:42px;padding:10px;transform:translateX(-50%);box-sizing:border-box;pointer-events:none;text-align:center;color:var(--blue-deep);background:#fff;border-top:4px solid var(--blue);box-shadow:var(--shadow-sm);font-weight:700}.canvas>.podium:before{content:"讲台"}
 .canvas-scroll{min-width:0;max-width:100%;max-height:calc(100dvh - 184px);overflow:auto;border:1px solid var(--line-strong);box-shadow:var(--shadow-sm)}.canvas-scroll>.canvas{min-height:0;border:0;box-shadow:none}
 
-/* Student and grade entry share the same quiet action band without changing submit flow. */
-.student-form{container-type:inline-size}.student-form>button[type="submit"].primary{position:relative;isolation:isolate;align-self:end;min-width:148px;margin-top:30px}.student-form>button[type="submit"].primary:before{content:"";position:absolute;z-index:-1;top:-18px;right:0;bottom:-18px;width:100cqw;background:#fbfdfe;border-top:1px solid var(--line)}
-@media(max-width:560px){.student-form>button[type="submit"].primary{width:100%;margin-top:28px}.student-form>button[type="submit"].primary:before{left:0;width:auto}}
+/* Student and grade entry share a full-width action band without changing submit flow. */
+.student-form>.form-actions--footer{width:100%;margin-top:30px;padding:18px 0 0;justify-content:flex-end;border-top:1px solid var(--line)}.student-form>.form-actions--footer .primary{min-width:148px}
+@media(max-width:560px){.student-form>.form-actions--footer{margin-top:28px}.student-form>.form-actions--footer .primary{width:100%}}
