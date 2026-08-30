@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-const deploymentBase = process.env.CI ? '/classpilot' : ''
+const deploymentBase = process.env.GITHUB_ACTIONS ? '/classpilot' : ''
 type Student = { name: string; studentNo: string }
 type Page = import('@playwright/test').Page
 
