@@ -1217,6 +1217,19 @@ function App({
         >
           <LayoutGrid />
         </button>
+        <button
+          type="button"
+          className="rail-new"
+          aria-label="新建班级"
+          onClick={() => {
+            setClassForm(emptyClass);
+            setClassError("");
+            setNewOpen(true);
+          }}
+        >
+          <Plus aria-hidden="true" />
+          <span>新建班级</span>
+        </button>
         <div className="rail-panel">
           <h2>班级</h2>
           <button
