@@ -237,7 +237,11 @@ function App({
         ? sessionFlag("classpilot:tool-rail-open", true)
         : false,
   );
-  const desktopViewport = typeof window === "undefined" || typeof window.matchMedia !== "function" || window.matchMedia("(min-width: 1025px)").matches;
+  const [desktopViewport, setDesktopViewport] = useState(() =>
+    typeof window === "undefined" ||
+    typeof window.matchMedia !== "function" ||
+    window.matchMedia("(min-width: 1025px)").matches,
+  );
   const [layoutMode, setLayoutMode] = useState<LayoutMode>("snap");
   const [activeDeskId, setActiveDeskId] = useState<string>();
   const [selectedId, setSelectedId] = useState<string>();
@@ -266,6 +270,19 @@ function App({
   const raf = useRef<number | undefined>(undefined);
   const [transient, setTransient] = useState<Record<string, DeskPosition>>({});
 
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") return;
+    const media = window.matchMedia("(min-width: 1025px)");
+    const syncViewport = (event: MediaQueryListEvent) => {
+      setDesktopViewport(event.matches);
+      if (!event.matches) {
+        setClassRailOpen(false);
+        setToolRailOpen(false);
+      }
+    };
+    media.addEventListener("change", syncViewport);
+    return () => media.removeEventListener("change", syncViewport);
+  }, []);
   useEffect(() => {
     let live = true;
     void repository
@@ -1194,8 +1211,7 @@ function App({
       <aside
         id="class-rail"
         data-testid="class-rail"
-        data-overlay={!classRailOpen ? "true" : undefined}
-        aria-hidden={!classRailOpen && !desktopViewport}
+        data-overlay={!desktopViewport ? "true" : undefined}
         className={`class-rail ${classRailOpen ? "open" : ""}`}
       >
         <button
@@ -1230,7 +1246,11 @@ function App({
           <Plus aria-hidden="true" />
           <span>新建班级</span>
         </button>
-        <div className="rail-panel">
+        <div
+          className="rail-panel"
+          data-testid="class-panel"
+          aria-hidden={!classRailOpen && !desktopViewport}
+        >
           <h2>班级</h2>
           <button
             type="button"
@@ -1285,8 +1305,7 @@ function App({
       <aside
         id="tool-rail"
         data-testid="tool-rail"
-        data-overlay={!toolRailOpen ? "true" : undefined}
-        aria-hidden={!toolRailOpen && !desktopViewport}
+        data-overlay={!desktopViewport ? "true" : undefined}
         className={`tool-rail ${toolRailOpen ? "open" : ""}`}
       >
         <button
@@ -1321,7 +1340,11 @@ function App({
           ))}
           <button type="button" className="tab" aria-label="班级设置" onClick={openSettings}>班级设置</button>
         </nav>
-        <section data-testid="tool-panel" className="tool-panel">
+        <section
+          data-testid="tool-panel"
+          className="tool-panel"
+          aria-hidden={!toolRailOpen && !desktopViewport}
+        >
           <button
             type="button"
             className="rail-close"

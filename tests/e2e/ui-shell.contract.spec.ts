@@ -116,10 +116,12 @@ test('desktop rails collapse independently and return space to the canvas', asyn
 })
 
 test('responsive rails are overlay drawers with usable focus and no page overflow', async ({ page }) => {
+  await page.setViewportSize({ width: 1024, height: 768 })
+  await page.goto('/')
+  await createClass(page, '响应式班级')
+
   for (const viewport of [{ width: 1024, height: 768 }, { width: 375, height: 812 }]) {
     await page.setViewportSize(viewport)
-    await page.goto('/')
-    await createClass(page, `响应式${viewport.width}`)
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
   }
 
@@ -131,7 +133,7 @@ test('responsive rails are overlay drawers with usable focus and no page overflo
   await expect(close).toBeFocused()
   await page.keyboard.press('Escape')
   await expect(page.getByRole('button', { name: '打开班级轨道' })).toBeFocused()
-  await expect(drawer).toHaveAttribute('aria-hidden', 'true')
+  await expect(page.getByTestId('class-panel')).toHaveAttribute('aria-hidden', 'true')
 })
 
 test('seat, delete, and realign remain operational through the tool rail', async ({ page }) => {
