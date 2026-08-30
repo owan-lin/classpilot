@@ -10,6 +10,15 @@ async function createClass(page: Page, name: string) {
   await page.getByRole('button', { name: '创建班级并开始' }).click()
   await expect(page.getByRole('region', { name: `${name} 教室座位画布` })).toBeVisible()
 }
+
+async function createClassWithLayout(page: Page, name: string, rows: number, desksPerRow: number) {
+  await page.getByRole('button', { name: '新建班级' }).first().click()
+  await page.getByRole('textbox', { name: '班级名称' }).fill(name)
+  await page.getByRole('spinbutton', { name: '排数' }).fill(String(rows))
+  await page.getByRole('spinbutton', { name: '每排桌数' }).fill(String(desksPerRow))
+  await page.getByRole('button', { name: '创建班级并开始' }).click()
+  await expect(page.getByRole('region', { name: `${name} 教室座位画布` })).toBeVisible()
+}
 async function openStudents(page: Page) {
   await page.getByRole('button', { name: '录入学生' }).click()
 }
@@ -175,11 +184,13 @@ test('教室编辑器支持普通/特殊座位增删、对齐与自由移动并�
   const firstDesk = desk(page, 1)
   const before = await firstDesk.getAttribute('style')
   const box = await firstDesk.locator('header').boundingBox()
+  const secondBox = await desk(page, 2).boundingBox()
   expect(box).not.toBeNull()
-  if (!box) throw new Error('课桌没有可拖动的边界框')
+  expect(secondBox).not.toBeNull()
+  if (!box || !secondBox) throw new Error('课桌没有可拖动的边界框')
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
   await page.mouse.down()
-  await page.mouse.move(box.x + 24, box.y + 74)
+  await page.mouse.move(secondBox.x + 10, secondBox.y + 10, { steps: 8 })
   await page.mouse.up()
   await expect.poll(() => firstDesk.getAttribute('style')).not.toBe(before)
   const moved = await firstDesk.getAttribute('style')
@@ -187,7 +198,8 @@ test('教室编辑器支持普通/特殊座位增删、对齐与自由移动并�
   await page.reload()
   await expect(page.getByRole('region', { name: '画布编辑班 教室座位画布' })).toBeVisible()
   await page.getByRole('button', { name: '编辑教室' }).click()
-  await expect.poll(() => desk(page, 1).getAttribute('style')).toBe(moved)
+  const withoutActiveLayer = (style: string | null) => style?.replace(/z-index: \d+;/, '')
+  await expect.poll(() => desk(page, 1).getAttribute('style').then(withoutActiveLayer)).toBe(withoutActiveLayer(moved))
 })
 
 test('自由编辑使用真实 pointer 流程，可重叠/进讲台，Escape 与 pointercancel 回滚', async ({ page }) => {
@@ -306,7 +318,7 @@ test('自由编辑的 Escape/pointercancel 回滚，删除按钮不启动拖动'
   await expect(first).toHaveAttribute('style', cancelBefore)
 })
 
-test('删除占座课桌后学生回到待安排区且资料不丢失', async ({ page }) => {
+test('删除占座课桌无需确认，学生回到待安排区且资料不丢失', async ({ page }) => {
   await page.goto('/')
   await createClass(page, '删除课桌班')
   await openStudents(page)
@@ -316,10 +328,89 @@ test('删除占座课桌后学生回到待安排区且资料不丢失', async ({
   await emptySeat(page, 1, 1).click()
   await page.getByRole('button', { name: '编辑教室' }).click()
 
+  let confirmationTriggered = false
+  page.on('dialog', async (dialog) => {
+    confirmationTriggered = true
+    await dialog.dismiss()
+  })
   await desk(page, 1).getByRole('button', { name: '删除课桌 1' }).click()
+  expect(confirmationTriggered).toBe(false)
   await expect(page.getByRole('status')).toContainText('回到待安排区')
   await openSeating(page)
   await expect(poolStudent(page, '保留甲')).toContainText('K-01')
+})
+
+test('动态座位画布允许 6×4 与 8×5 的有效班级参数', async ({ page }) => {
+  await page.goto('/')
+  await createClassWithLayout(page, '六乘四班', 6, 4)
+  await expect(page.getByRole('region', { name: '六乘四班 教室座位画布' }).getByRole('article')).toHaveCount(24)
+
+  await createClassWithLayout(page, '八乘五班', 8, 5)
+  await expect(page.getByRole('region', { name: '八乘五班 教室座位画布' }).getByRole('article')).toHaveCount(40)
+})
+
+test('拖动中的课桌位于其余课桌之上，并按实际 canvas 坐标提交移动', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto('/')
+  await createClassWithLayout(page, '层级拖动班', 6, 4)
+  await page.getByRole('button', { name: '编辑教室' }).click()
+  await page.getByRole('button', { name: '自由移动' }).click()
+
+  const canvas = page.getByRole('region', { name: '层级拖动班 教室座位画布' })
+  const movingDesk = desk(page, 1)
+  const otherDesk = desk(page, 2)
+  const canvasBox = await canvas.boundingBox()
+  const headerBox = await movingDesk.locator('header').boundingBox()
+  expect(canvasBox).not.toBeNull()
+  expect(headerBox).not.toBeNull()
+  if (!canvasBox || !headerBox) throw new Error('画布或课桌拖动把手不可用')
+  const before = await movingDesk.getAttribute('style')
+
+  await page.mouse.move(headerBox.x + headerBox.width / 2, headerBox.y + headerBox.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(canvasBox.x + canvasBox.width * 0.72, canvasBox.y + canvasBox.height * 0.62, { steps: 8 })
+  const movingZIndex = await movingDesk.evaluate((element) => Number(getComputedStyle(element).zIndex))
+  const otherZIndex = await otherDesk.evaluate((element) => Number(getComputedStyle(element).zIndex))
+  expect(movingZIndex).toBeGreaterThan(otherZIndex)
+  await page.mouse.up()
+  await expect.poll(() => movingDesk.getAttribute('style')).not.toBe(before)
+})
+
+test('学生和成绩操作区可仅用键盘抵达，桌面视口中的提交按钮稳定可见', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto('/')
+  await createClass(page, '键盘表单班')
+  await openStudents(page)
+
+  const name = page.getByRole('textbox', { name: '姓名' })
+  await name.focus()
+  await page.keyboard.type('键盘学生')
+  await page.keyboard.press('Tab')
+  await page.keyboard.press('Tab')
+  await page.keyboard.type('KB-01')
+  await page.keyboard.press('Tab')
+  await page.keyboard.type('键盘备注')
+  await page.keyboard.press('Tab')
+  await expect(page.getByRole('button', { name: '保存并继续' })).toBeFocused()
+  await page.keyboard.press('Enter')
+  await expect(page.getByRole('button', { name: /键盘学生.*KB-01/ })).toBeVisible()
+
+  await page.getByRole('button', { name: '成绩' }).click()
+  const gradeForm = page.locator('form.student-form')
+  const studentSelect = gradeForm.getByRole('combobox', { name: '成绩学生' })
+  await studentSelect.focus()
+  await page.keyboard.press('ArrowDown')
+  await expect(studentSelect).not.toHaveValue('')
+  await page.keyboard.press('Tab')
+  await expect(gradeForm.getByRole('textbox', { name: '学科' })).toBeFocused()
+
+  for (const button of await gradeForm.getByRole('button').all()) {
+    const box = await button.boundingBox()
+    expect(box).not.toBeNull()
+    if (!box) throw new Error('成绩操作按钮没有可见布局')
+    expect(box.y + box.height).toBeLessThanOrEqual(900)
+    expect(box.x + box.width).toBeLessThanOrEqual(1440)
+  }
 })
 
 test.describe('响应式核心工作台', () => {

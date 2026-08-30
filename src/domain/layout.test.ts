@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import fc from 'fast-check'
 import { alignedDeskPositions, classroomStage, classroomStageFor, constrainFreeDeskPosition, isDeskPositionValid, isFreeDeskPositionVisible, isRegularGridUsable, rebuildRegularLayout, snapDeskPosition } from './layout'
 import type { DeskRecord } from './types'
 
@@ -33,6 +34,37 @@ describe('classroom layout contracts', () => {
     expect(first[4].x).toBeLessThan(stage.originX)
     expect(first[6].x).toBeGreaterThan(stage.originX + 2 * 190)
     expect(first.slice(4).every((position) => position.y >= stage.originY)).toBe(true)
+  })
+
+  it('keeps aligned layouts stable without changing desk identities or assignments', () => {
+    fc.assert(fc.property(
+      fc.integer({ min: 1, max: 4 }),
+      fc.integer({ min: 1, max: 4 }),
+      fc.integer({ min: 0, max: 20 }),
+      fc.integer({ min: 0, max: 8 }),
+      (rows, desksPerRow, regularCount, specialCount) => {
+        const regular = Array.from({ length: regularCount }, (_, index) => desk(`regular-${index}`, index * 11, index * 7))
+        const special = Array.from({ length: specialCount }, (_, index) => ({ ...desk(`special-${index}`, index * 13, index * 5), kind: 'special' as const }))
+        const desks = [...regular, ...special]
+        const mainCount = Math.min(regular.length, rows * desksPerRow)
+        const stage = classroomStageFor({ rows, desksPerRow, sideDeskCount: Math.max(regular.length - mainCount, special.length) })
+        const first = alignedDeskPositions(desks, { rows, desksPerRow }, stage)
+        const repositioned = desks.map((item, index) => ({ ...item, ...first[index] }))
+        const second = alignedDeskPositions(repositioned, { rows, desksPerRow }, stage)
+        const assignments = desks.map((item, index) => ({ seatId: item.seatIds[0], studentId: `student-${index}` }))
+        const draft = { id: 'draft', classId: 'class', podium: { x: 400, y: 0, width: 200, height: 64 }, desks, assignments, createdAt: '2026-01-01', updatedAt: '2026-01-01' }
+        const alignedDraft = { ...draft, desks: repositioned }
+        const rightWing = stage.originX + desksPerRow * 190 + (desksPerRow - 1) * stage.gapX + stage.sideGap
+
+        expect(first).toHaveLength(desks.length)
+        expect(second).toEqual(first)
+        expect(alignedDraft.desks.map((item) => item.id)).toEqual(draft.desks.map((item) => item.id))
+        expect(alignedDraft.assignments).toEqual(draft.assignments)
+        expect(first.slice(0, mainCount).every((position) => position.x >= stage.originX && position.y >= stage.originY)).toBe(true)
+        expect(first.slice(mainCount, regular.length).every((position) => position.x < stage.originX && position.y >= stage.originY)).toBe(true)
+        expect(first.slice(regular.length).every((position) => position.x >= rightWing && position.y >= stage.originY)).toBe(true)
+      },
+    ), { numRuns: 100 })
   })
 
   it('allows overlap and podium-area positions in free mode while retaining a grab strip', () => {
