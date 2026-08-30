@@ -2,7 +2,7 @@
 
 ClassPilot 是一款离线优先的班级座位工作台，当前版本专注于四个核心流程：新建班级、编辑教室、录入学生和查看学生档案。班级数据默认只保存在当前设备。
 
-> 当前版本：v0.2.1。仓库、测试和示例只使用虚构学生数据。
+> 当前版本：v0.3.1。仓库、测试和示例只使用虚构学生数据。
 
 ## 立即使用
 
@@ -20,6 +20,7 @@ ClassPilot 是一款离线优先的班级座位工作台，当前版本专注于
 - 在“录入学生”中手动连续添加学生；姓名必填，学号可留空且会校验重复学号。
 - 在“排座 / 移位”中点击学生和目标座位，或直接拖动学生完成入座、移位和交换。
 - 点击已入座学生或学生列表即可查看档案，并进行基础编辑或删除。
+- 手动录入成绩，并查看基础百分比趋势；CSV 成绩导入仍处于预览阶段。
 
 ## 暂未开放
 
@@ -64,15 +65,15 @@ npm run desktop:build
 
 ## 发布
 
-- `main` 通过 GitHub Actions 部署网页版。
-- `v*` 标签触发 Windows 构建并创建 GitHub Release。
+- `main` 只运行检查，不直接改变正式网页版。
+- 同一个 `v*` 标签同时触发网页版和 Windows 版构建；版本号不一致时发布会失败。
 - [最新版发布页](https://github.com/owan-lin/classpilot/releases/latest)始终提供当前公开桌面版本。
 
 ## English
 
 ClassPilot is an offline-first classroom workspace focused on four core flows: create a class, edit a classroom canvas, enter students manually, and view student profiles. The current release supports aligned or free-form desk movement and click-or-drag seating interactions.
 
-Excel roster import, history, full backup, and print/PDF export are not available in v0.2.1.
+Excel roster import, history, full backup, and print/PDF export are not available in v0.3.1.
 
 No real student data belongs in this repository. Classroom records remain on the teacher's device by default.
 
