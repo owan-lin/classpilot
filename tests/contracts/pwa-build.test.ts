@@ -37,9 +37,12 @@ describe('PWA build isolation', () => {
   })
 
   it('uses a versioned same-origin window entry without moving storage origins', () => {
-    const config = readFileSync(join(process.cwd(), 'src-tauri/tauri.conf.json'), 'utf8')
-    expect(config).toContain('"url": "index.html?v=0.3.0"')
-    expect(config).not.toContain('useHttpsScheme')
+    const configText = readFileSync(join(process.cwd(), 'src-tauri/tauri.conf.json'), 'utf8')
+    const config = JSON.parse(configText)
+    const packageVersion = JSON.parse(readFileSync(join(process.cwd(), 'package.json'), 'utf8')).version
+    expect(config.version).toBe(packageVersion)
+    expect(config.app.windows[0].url).toBe(`index.html?v=${packageVersion}`)
+    expect(configText).not.toContain('useHttpsScheme')
   })
 
   it('keeps the web PWA integration', () => {
