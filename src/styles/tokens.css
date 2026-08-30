@@ -51,3 +51,5 @@
   --space-6: 24px;
   --space-8: 32px;
 }
+/* Immersive classroom workbench */
+:root{--frame-navy:#173f5f;--action-blue:#1f628d;--chalk:#f2f5f3;--wood:#ead8b8;--gender-male:#dceef8;--gender-female:#f8e3eb;--gender-unspecified:#e8ecef;--divider:#c7d4dc}
