@@ -28,4 +28,5 @@ html[data-profile-gender="male"] .profile dl div:first-child dd,html[data-profil
 
 /* Student and grade entry share a full-width action band without changing submit flow. */
 .student-form>.form-actions--footer{width:100%;margin-top:30px;padding:18px 0 0;justify-content:flex-end;border-top:1px solid var(--line)}.student-form>.form-actions--footer .primary{min-width:148px}
-@media(max-width:560px){.student-form>.form-actions--footer{margin-top:28px}.student-form>.form-actions--footer .primary{width:100%}}
+.student-form--grades{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 12px;align-content:start}.student-form--grades label{min-width:0;margin-top:0}.student-form--grades input,.student-form--grades select{width:100%}.student-form--grades h2,.student-form--grades label:first-of-type,.student-form--grades label:nth-of-type(4),.student-form--grades>.form-actions--footer{grid-column:1/-1}.student-form--grades>.form-actions--footer{margin-top:8px;padding-top:6px}
+@media(max-width:560px){.student-form>.form-actions--footer{margin-top:28px}.student-form>.form-actions--footer .primary{width:100%}.student-form--grades{grid-template-columns:1fr}}
