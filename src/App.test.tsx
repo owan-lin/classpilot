@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
@@ -7,7 +7,11 @@ import { createDefaultDraft } from './features/drafts/createDraft'
 
 const fixtures: TestRepositoryFixture[] = []
 const setup = () => { const fixture = createTestRepository(); fixtures.push(fixture); return fixture }
-afterEach(async () => { await Promise.all(fixtures.splice(0).map(disposeTestRepository)) })
+afterEach(async () => {
+  cleanup()
+  await new Promise((resolve) => setTimeout(resolve, 250))
+  await Promise.all(fixtures.splice(0).map(disposeTestRepository))
+})
 
 describe('核心班级工作台', () => {
   it('显示新建班级空态', () => { render(<App repository={setup().repository} />); expect(screen.getByText('先创建一个班级')).toBeInTheDocument() })

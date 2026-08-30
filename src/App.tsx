@@ -267,14 +267,20 @@ function App({
   const [transient, setTransient] = useState<Record<string, DeskPosition>>({});
 
   useEffect(() => {
-    void repository.listClasses().then((items) => {
-      setClasses(items);
-      setClassId((current) =>
-        current && items.some((item) => item.id === current)
-          ? current
-          : items[0]?.id,
-      );
-    });
+    let live = true;
+    void repository
+      .listClasses()
+      .then((items) => {
+        if (!live) return;
+        setClasses(items);
+        setClassId((current) =>
+          current && items.some((item) => item.id === current)
+            ? current
+            : items[0]?.id,
+        );
+      })
+      .catch(() => undefined);
+    return () => { live = false; };
   }, [repository]);
   useEffect(() => {
     try {
