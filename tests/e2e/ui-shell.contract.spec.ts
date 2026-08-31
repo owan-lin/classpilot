@@ -91,6 +91,16 @@ test('1440×900 concept layout keeps rails, panels, canvas, podium, and desks in
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto('/')
   await createClass(page, '概念图工作台班')
+  const seatedStudent = { name: '完整姓名学生甲', studentNo: 'VIS-01', gender: 'female' as const }
+  await addStudent(page, seatedStudent)
+  await page.getByRole('button', { name: '排座 / 移位' }).click()
+  await genderedStudent(page, seatedStudent.gender, seatedStudent.name).click()
+  await page.getByTestId('seat').filter({ hasText: '空位' }).first().click()
+  const occupiedSeat = page.getByTestId('seat').filter({ hasText: seatedStudent.name })
+  await expect(occupiedSeat).toBeVisible()
+  await expect(occupiedSeat).toContainText(seatedStudent.name)
+  await expect(occupiedSeat).toContainText(/女/)
+  await expect(occupiedSeat).toHaveAttribute('data-gender', seatedStudent.gender)
 
   const workbench = page.getByTestId('classroom-workbench')
   await expect(workbench).toBeVisible()
@@ -171,8 +181,20 @@ test('1440×900 concept layout keeps rails, panels, canvas, podium, and desks in
   const toolNavigation = page.getByRole('navigation', { name: '班级工具' })
   for (const tool of ['排座 / 移位', '编辑教室', '录入学生', '成绩']) {
     const control = toolNavigation.getByRole('button', { name: tool })
+    await expect(control).toBeVisible()
     await expect(control).toContainText(tool)
     await expect(control.locator('svg')).toHaveCount(1)
+    const controlBox = await control.boundingBox()
+    if (!controlBox) throw new Error(`右侧工具 ${tool} 不可测量`)
+    expect(controlBox.x).toBeGreaterThanOrEqual(toolRailBandBox.x - 1)
+    expect(controlBox.x + controlBox.width).toBeLessThanOrEqual(toolRailBandBox.x + toolRailBandBox.width + 1)
+    expect(controlBox.y).toBeGreaterThanOrEqual(toolRailBandBox.y - 1)
+    expect(controlBox.y + controlBox.height).toBeLessThanOrEqual(toolRailBandBox.y + toolRailBandBox.height + 1)
+    await expect.poll(() => control.evaluate((element) => {
+      const box = element.getBoundingClientRect()
+      const topmost = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2)
+      return topmost === element || element.contains(topmost)
+    })).toBe(true)
   }
 
   for (const tool of ['排座 / 移位', '编辑教室', '录入学生', '成绩']) {
