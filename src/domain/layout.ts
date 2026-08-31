@@ -1,8 +1,8 @@
 import type { DeskRecord, LayoutDraft } from "./types";
 
 export const regularDeskSpec = {
-  width: 190,
-  height: 112,
+  width: 200,
+  height: 105,
   capacity: 2 as const,
 } as const;
 export const specialDeskSpec = {
@@ -50,7 +50,7 @@ export function classroomStageFor(
   );
   const grid = 25,
     gapX = 35,
-    gapY = 38,
+    gapY = 20,
     sideGap = 45;
   const sideRows = Math.max(
     0,

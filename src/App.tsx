@@ -70,6 +70,24 @@ const emptyGrade = {
   fullScore: "",
   note: "",
 };
+
+/** Upgrade the original 190×112 records without changing their identity or seats. */
+function normalizeLegacyRegularDeskGeometry(draft: LayoutDraft): LayoutDraft {
+  let changed = false;
+  const desks = draft.desks.map((desk) => {
+    if (desk.kind !== "regular" || desk.width !== 190 || desk.height !== 112)
+      return desk;
+    changed = true;
+    return {
+      ...desk,
+      width: regularDeskSpec.width,
+      height: regularDeskSpec.height,
+    };
+  });
+  return changed
+    ? { ...draft, desks, updatedAt: new Date().toISOString() }
+    : draft;
+}
 const emptyClass = {
   name: "",
   grade: "",
@@ -334,14 +352,15 @@ function App({
     ])
       .then(async ([classroom, roster, saved, scores]) => {
         if (!classroom) return;
-        const next =
+        const next = normalizeLegacyRegularDeskGeometry(
           saved ??
-          createDefaultDraft(classId, {
-            rows: classroom.rows,
-            desksPerRow: classroom.desksPerRow,
-            capacity: classroom.deskCapacity,
-          });
-        if (!saved) await repository.saveDraft(next);
+            createDefaultDraft(classId, {
+              rows: classroom.rows,
+              desksPerRow: classroom.desksPerRow,
+              capacity: classroom.deskCapacity,
+            }),
+        );
+        if (!saved || next !== saved) await repository.saveDraft(next);
         if (!live) return;
         setStudents(roster);
         setGrades(scores);
@@ -820,7 +839,11 @@ function App({
         className={`canvas view-${view} ${view === "room" && layoutMode === "snap" ? "snap-grid" : ""}`}
         role="region"
         aria-label={`${active.name} 教室座位画布`}
-        style={{ width: `${stage.width / 10}%`, height: `${stage.height}px` }}
+        style={{
+          width: `${stage.width / 10}%`,
+          height: `${stage.height}px`,
+          aspectRatio: `${stage.width} / ${stage.height}`,
+        }}
       >
         <div className="podium" data-testid="podium" aria-label="讲台" />
         <div className="row-labels" aria-hidden="true">{Array.from({ length: active.rows }, (_, index) => <span key={index} style={{ top: `${(stage.originY + index * (regularDeskSpec.height + stage.gapY)) / stage.height * 100}%` }}>第{index + 1}排</span>)}</div>
