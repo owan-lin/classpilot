@@ -7,12 +7,15 @@ import {
   type PointerEvent,
 } from "react";
 import {
+  BarChart3,
   Grip,
   LayoutGrid,
   Plus,
   RotateCcw,
+  PencilRuler,
   Settings,
   UserPlus,
+  UserRound,
   Users,
   X,
 } from "lucide-react";
@@ -814,12 +817,13 @@ function App({
     <section className="canvas-scroll" data-testid="classroom-canvas">
       <div
         ref={canvasRef}
-        className={`canvas ${view === "room" && layoutMode === "snap" ? "snap-grid" : ""}`}
+        className={`canvas view-${view} ${view === "room" && layoutMode === "snap" ? "snap-grid" : ""}`}
         role="region"
         aria-label={`${active.name} 教室座位画布`}
         style={{ width: `${stage.width / 10}%`, height: `${stage.height}px` }}
       >
         <div className="podium" data-testid="podium" aria-label="讲台" />
+        <div className="row-labels" aria-hidden="true">{Array.from({ length: active.rows }, (_, index) => <span key={index} style={{ top: `${(stage.originY + index * (regularDeskSpec.height + stage.gapY)) / stage.height * 100}%` }}>第{index + 1}排</span>)}</div>
         {draft?.desks.map((desk, index) => {
           const position = transient[desk.id] ?? desk;
           return (
@@ -1208,6 +1212,9 @@ function App({
     );
   return (
     <main className="pilot" data-testid="classroom-workbench">
+      <div data-testid="class-rail-band" className="rail-band class-rail-band" aria-hidden="true" />
+      <div data-testid="tool-rail-band" className="rail-band tool-rail-band" aria-hidden="true" />
+      <div data-testid="drawer-backdrop" className={classRailOpen || toolRailOpen ? "drawer-backdrop visible" : "drawer-backdrop"} aria-hidden="true" onClick={() => { closeClassRail(); closeToolRail(); }} />
       <aside
         id="class-rail"
         data-testid="class-rail"
@@ -1233,6 +1240,7 @@ function App({
         >
           <LayoutGrid />
         </button>
+        <div className="rail-wordmark"><b>ClassPilot</b></div>
         <button
           type="button"
           className="rail-new"
@@ -1323,12 +1331,12 @@ function App({
         <nav aria-label="班级工具">
           {(
             [
-              ["seating", "排座 / 移位"],
-              ["room", "编辑教室"],
-              ["students", "录入学生"],
-              ["grades", "成绩"],
+              ["seating", "排座 / 移位", Users],
+              ["room", "编辑教室", PencilRuler],
+              ["students", "录入学生", UserRound],
+              ["grades", "成绩", BarChart3],
             ] as const
-          ).map(([key, label]) => (
+          ).map(([key, label, Icon]) => (
             <button
               key={key}
               type="button"
@@ -1336,6 +1344,7 @@ function App({
               className={view === key ? "tab active" : "tab"}
               onClick={() => activateTool(key)}
             >
+              <Icon aria-hidden="true" />
               {label}
             </button>
           ))}
