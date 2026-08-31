@@ -238,6 +238,50 @@ test('desktop rails collapse independently and return space to the canvas', asyn
   await expect.poll(async () => (await canvas(page).boundingBox())?.width).toBeGreaterThan(before.width)
 })
 
+test('wide desktop workbench never page-scrolls and keeps the student tool panel usable', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto('/')
+  await createClass(page, '宽屏契约班')
+
+  const toolNavigation = page.getByRole('navigation', { name: '班级工具' })
+  for (const width of [1440, 1920, 2560]) {
+    await page.setViewportSize({ width, height: 900 })
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+    await expect(toolNavigation).toBeVisible()
+    const navigationBox = await toolNavigation.boundingBox()
+    if (!navigationBox) throw new Error(`宽度 ${width}px 时工具轨道不可测量`)
+    expect(navigationBox.x).toBeGreaterThanOrEqual(0)
+    expect(navigationBox.x + navigationBox.width).toBeLessThanOrEqual(width)
+  }
+
+  const regularDesk = canvas(page).getByRole('article').first()
+  const regularDeskBox = await regularDesk.boundingBox()
+  if (!regularDeskBox) throw new Error('宽屏教室缺少普通双人桌')
+  expect(regularDeskBox.width / regularDeskBox.height).toBeGreaterThanOrEqual(1.5)
+  const deskSeats = regularDesk.getByTestId('seat')
+  await expect(deskSeats).toHaveCount(2)
+  const [leftSeat, rightSeat] = await Promise.all([deskSeats.nth(0).boundingBox(), deskSeats.nth(1).boundingBox()])
+  if (!leftSeat || !rightSeat) throw new Error('普通双人桌缺少可测量座位')
+  expect(leftSeat.x).toBeLessThan(rightSeat.x)
+  expectCloseTo(leftSeat.y, rightSeat.y, 3)
+
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.getByRole('button', { name: '录入学生' }).click()
+  const panel = toolPanel(page)
+  const studentForm = panel.locator('form.student-form')
+  await expect(studentForm).toBeVisible()
+  await expect.poll(() => panel.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
+  await expect.poll(() => studentForm.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
+  const fields = studentForm.locator('input, select')
+  expect(await fields.count()).toBeGreaterThan(0)
+  for (let index = 0; index < await fields.count(); index += 1) {
+    const fieldBox = await fields.nth(index).boundingBox()
+    if (!fieldBox) throw new Error(`录入学生字段 ${index + 1} 不可测量`)
+    expect(fieldBox.height).toBeGreaterThanOrEqual(36)
+    expect(fieldBox.height).toBeLessThanOrEqual(52)
+  }
+})
+
 test('375×812 uses bounded overlay drawers and never overflows the page horizontally', async ({ page }) => {
   await page.setViewportSize({ width: 1024, height: 768 })
   await page.goto('/')
