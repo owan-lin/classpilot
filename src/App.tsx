@@ -1283,6 +1283,7 @@ function App({
         {active ? (
           <>
             <header className="canvas-title">
+              <Users aria-hidden="true" />
               <b>{active.name}</b>
               <span>{active.grade || active.academicYear}</span>
             </header>
