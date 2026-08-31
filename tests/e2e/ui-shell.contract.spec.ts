@@ -60,6 +60,20 @@ async function expectGenderSemantics(page: Page, gender: Gender, name: string, l
   await expect(student).toContainText(label)
 }
 
+test('E2E boot does not reload while opening the new-class form', async ({ page }) => {
+  let applicationNavigations = 0
+  page.on('framenavigated', (frame) => {
+    if (frame === page.mainFrame() && frame.url().includes('127.0.0.1:4173')) applicationNavigations += 1
+  })
+
+  await page.goto('/')
+  await page.getByRole('button', { name: '新建班级' }).first().click()
+  await expect(page.getByRole('textbox', { name: '班级名称' })).toBeVisible()
+  await page.waitForTimeout(750)
+  await expect(page.getByRole('textbox', { name: '班级名称' })).toBeVisible()
+  expect(applicationNavigations).toBe(1)
+})
+
 test('gender is semantic and readable in pool, seat, selected state, and profile', async ({ page }) => {
   await page.goto('/')
   await createClass(page, '性别语义班')
