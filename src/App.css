@@ -73,3 +73,9 @@ html[data-profile-gender="male"] .profile dl div:first-child dd,html[data-profil
 @media(min-width:1025px){.class-rail{grid-template-rows:52px 54px 1fr}.rail-wordmark{grid-column:1;grid-row:1;align-self:center;justify-self:center;margin:0;writing-mode:horizontal-tb;color:#fff;font-size:14px;letter-spacing:.02em}.class-rail>.rail-toggle{grid-column:1;grid-row:2;width:106px;height:54px}.class-rail>.rail-new{grid-column:1;grid-row:3;align-self:start;width:106px;height:54px}.tool-rail>.rail-toggle{z-index:3}.tool-rail>nav{z-index:3}.tool-rail nav .tab{color:#dbe9f1}.tool-rail nav .tab.active{color:#fff}.seat.occupied b{max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.view-seating .seats{align-items:start}}
 @media(min-width:1025px){.view-seating .seats{grid-template-rows:48px;grid-auto-rows:48px}}
 @media(max-width:1024px){.class-rail>.rail-toggle,.tool-rail>.rail-toggle,.rail-new,.class-rail>.rail-panel,.tool-rail>.tool-panel{position:fixed}}
+
+/* Give each seated learner a useful card area and let the desk legs sit below it. */
+.desk{overflow:visible}
+.desk>header,.desk>.seats{position:relative;z-index:1}
+.desk:after{z-index:0}
+.view-seating .seats{grid-template-rows:76px;grid-auto-rows:76px;align-content:start}
