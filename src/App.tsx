@@ -898,10 +898,9 @@ function App({
                       {student ? (
                         <>
                           <b>{student.name}</b>
-                          <small>
-                            {studentGenderLabel(student.gender)} ·{" "}
-                            {student.studentNo || "无学号"}
-                          </small>
+                          <span className="gender-badge">
+                            {studentGenderLabel(student.gender)}
+                          </span>
                         </>
                       ) : (
                         "空位"
@@ -919,7 +918,6 @@ function App({
   const seatingPanel = (
     <>
       <section className="mode-strip">
-        <b>排座模式</b>
         <span>{pool.length} 名待安排</span>
       </section>
       <section className="pool" aria-label="待安排学生">
@@ -952,9 +950,11 @@ function App({
                   }
                 >
                   <b>{student.name}</b>
-                  <span>
-                    {studentGenderLabel(student.gender)} ·{" "}
-                    {student.studentNo || "未填学号"}
+                  <span className="pool-meta">
+                    <span className="gender-badge">
+                      {studentGenderLabel(student.gender)}
+                    </span>
+                    <small>{student.studentNo || "未填学号"}</small>
                   </span>
                 </button>
                 <button
@@ -975,6 +975,15 @@ function App({
       </section>
     </>
   );
+
+  const toolTitle =
+    view === "seating"
+      ? "排座 / 移位"
+      : view === "room"
+        ? "编辑教室"
+        : view === "students"
+          ? "录入学生"
+          : "成绩";
 
   const panelContent =
     view === "seating" ? (
@@ -1363,6 +1372,7 @@ function App({
           >
             <X />
           </button>
+          <h1 className="tool-panel-title">{toolTitle}</h1>
           {active && panelContent}
         </section>
       </aside>
