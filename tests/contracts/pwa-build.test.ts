@@ -49,8 +49,12 @@ describe('PWA build isolation', () => {
     const output = buildWithEnvironment(false)
     try {
       const index = readFileSync(join(output, 'index.html'), 'utf8')
+      const serviceWorker = readFileSync(join(output, 'sw.js'), 'utf8')
       expect(index).toContain('registerSW.js')
       expect(readdirSync(output)).toEqual(expect.arrayContaining(['manifest.webmanifest', 'sw.js']))
+      expect(serviceWorker).toContain('self.skipWaiting()')
+      expect(serviceWorker).toContain('clientsClaim()')
+      expect(serviceWorker).toContain('cleanupOutdatedCaches()')
     } finally {
       rmSync(output, { recursive: true, force: true })
     }

@@ -7,7 +7,7 @@ import { defineConfig } from 'vitest/config'
 const isTauriBuild = Boolean(process.env.TAURI_ENV_PLATFORM)
 const basePath = process.env.GITHUB_ACTIONS && !isTauriBuild ? '/classpilot/' : '/'
 const pwaPlugins = isTauriBuild ? [] : [VitePWA({
-  registerType: 'prompt',
+  registerType: 'autoUpdate',
   injectRegister: 'auto',
   includeAssets: ['favicon.svg', 'icons/*.png'],
   manifest: {
@@ -29,6 +29,8 @@ const pwaPlugins = isTauriBuild ? [] : [VitePWA({
   },
   workbox: {
     cleanupOutdatedCaches: true,
+    clientsClaim: true,
+    skipWaiting: true,
     globPatterns: ['**/*.{js,css,html,woff2,png,svg,ico,webmanifest}'],
     navigateFallbackDenylist: [/^\/api\//],
   },
