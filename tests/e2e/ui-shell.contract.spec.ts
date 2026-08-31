@@ -4,8 +4,34 @@ type Page = import('@playwright/test').Page
 type Gender = 'male' | 'female' | 'unspecified'
 
 const rail = (page: Page, side: 'class' | 'tool') => page.getByTestId(`${side}-rail`)
+const railBand = (page: Page, side: 'class' | 'tool') => page.getByTestId(`${side}-rail-band`)
 const canvas = (page: Page) => page.getByTestId('classroom-canvas')
 const toolPanel = (page: Page) => page.getByTestId('tool-panel')
+
+type Box = NonNullable<Awaited<ReturnType<Page['locator']>['boundingBox']>>
+
+function expectCloseTo(actual: number, expected: number, tolerance = 2) {
+  expect(Math.abs(actual - expected)).toBeLessThanOrEqual(tolerance)
+}
+
+function expectSameBox(actual: Box, expected: Box, tolerance = 2) {
+  expectCloseTo(actual.x, expected.x, tolerance)
+  expectCloseTo(actual.y, expected.y, tolerance)
+  expectCloseTo(actual.width, expected.width, tolerance)
+  expectCloseTo(actual.height, expected.height, tolerance)
+}
+
+async function expectDeepBlue(locator: ReturnType<Page['getByTestId']>) {
+  const color = await locator.evaluate((element) => getComputedStyle(element).backgroundColor)
+  const channels = color.match(/\d+/g)?.map(Number)
+  expect(channels, `深蓝轨道应使用不透明颜色，收到 ${color}`).toHaveLength(3)
+  if (!channels) throw new Error('无法解析轨道背景色')
+  const [red, green, blue] = channels
+  expect(red).toBeLessThanOrEqual(35)
+  expect(green).toBeGreaterThanOrEqual(45)
+  expect(green).toBeLessThanOrEqual(95)
+  expect(blue).toBeGreaterThanOrEqual(70)
+}
 
 async function createClass(page: Page, name: string) {
   await page.getByRole('button', { name: '新建班级' }).first().click()
@@ -61,36 +87,101 @@ test('gender is semantic and readable in pool, seat, selected state, and profile
   await expect(profile.getByTestId('gender-status')).toContainText(/男/)
 })
 
-test('desktop keeps one aligned classroom workbench while tool contents change in one slot', async ({ page }) => {
+test('1440×900 concept layout keeps rails, panels, canvas, podium, and desks in their intended zones', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto('/')
-  await createClass(page, '工作台班')
+  await createClass(page, '概念图工作台班')
 
   const workbench = page.getByTestId('classroom-workbench')
   await expect(workbench).toBeVisible()
   const initialCanvas = await canvas(page).boundingBox()
   const classRail = await rail(page, 'class').boundingBox()
+  const toolRail = await rail(page, 'tool').boundingBox()
+  const classRailBand = railBand(page, 'class')
+  const toolRailBand = railBand(page, 'tool')
+  const classRailBandBox = await classRailBand.boundingBox()
+  const toolRailBandBox = await toolRailBand.boundingBox()
+  const classPanel = await page.getByTestId('class-panel').boundingBox()
   const initialToolPanel = await toolPanel(page).boundingBox()
-  expect(initialCanvas).not.toBeNull()
-  expect(classRail).not.toBeNull()
-  expect(initialToolPanel).not.toBeNull()
-  if (!initialCanvas || !classRail || !initialToolPanel) throw new Error('工作台缺少可测量的三栏区域')
-  expect(initialCanvas.width).toBeGreaterThan(classRail.width)
-  expect(initialCanvas.width).toBeGreaterThan(initialToolPanel.width)
-  expect(Math.abs(initialCanvas.y - classRail.y)).toBeLessThanOrEqual(2)
-  expect(Math.abs(initialCanvas.y - initialToolPanel.y)).toBeLessThanOrEqual(2)
-  expect(Math.abs(initialCanvas.y + initialCanvas.height - classRail.y - classRail.height)).toBeLessThanOrEqual(2)
+  const classToggle = await page.getByRole('button', { name: '折叠班级轨道' }).boundingBox()
+  const toolToggle = await page.getByRole('button', { name: '折叠工具轨道' }).boundingBox()
+  const podium = await page.getByTestId('podium').boundingBox()
+  const firstDesk = await canvas(page).getByRole('article').first().boundingBox()
+  if (!initialCanvas || !classRail || !toolRail || !classRailBandBox || !toolRailBandBox || !classPanel || !initialToolPanel || !classToggle || !toolToggle || !podium || !firstDesk)
+    throw new Error('概念图工作台缺少可测量的必要区域')
+
+  // These are deliberately ranges, not screenshot pixels: the approved concept
+  // calls for a 106px left rail, ~201px class panel, ≥850px teaching canvas,
+  // ~204px tool panel, and 72px right rail at this viewport.
+  expectCloseTo(classToggle.x, 0)
+  expect(classToggle.width).toBeGreaterThanOrEqual(90)
+  expect(classToggle.width).toBeLessThanOrEqual(120)
+  expectCloseTo(classPanel.x, classToggle.width)
+  expect(classPanel.width).toBeGreaterThanOrEqual(180)
+  expect(classPanel.width).toBeLessThanOrEqual(225)
+  expectCloseTo(initialCanvas.x, classPanel.x + classPanel.width)
+  expect(initialCanvas.width).toBeGreaterThanOrEqual(850)
+  expect(initialCanvas.width / 1440).toBeLessThan(0.66)
+  expectCloseTo(initialToolPanel.x, initialCanvas.x + initialCanvas.width)
+  expect(initialToolPanel.width).toBeGreaterThanOrEqual(180)
+  expect(initialToolPanel.width).toBeLessThanOrEqual(240)
+  expectCloseTo(toolToggle.x + toolToggle.width, 1440)
+  expect(toolToggle.width).toBeGreaterThanOrEqual(60)
+  expect(toolToggle.width).toBeLessThanOrEqual(90)
+  expectCloseTo(initialCanvas.y, 0)
+  expectCloseTo(initialCanvas.height, 900)
+  expectCloseTo(classPanel.y, initialCanvas.y)
+  expectCloseTo(initialToolPanel.y, initialCanvas.y)
+  expectCloseTo(classRail.height, initialCanvas.height)
+  expectCloseTo(toolRail.height, initialCanvas.height)
+  expectCloseTo(classRailBandBox.x, 0)
+  expectCloseTo(classRailBandBox.y, 0)
+  expectCloseTo(classRailBandBox.height, 900)
+  expect(classRailBandBox.width).toBeGreaterThanOrEqual(90)
+  expect(classRailBandBox.width).toBeLessThanOrEqual(120)
+  expectCloseTo(toolRailBandBox.x + toolRailBandBox.width, 1440)
+  expectCloseTo(toolRailBandBox.y, 0)
+  expectCloseTo(toolRailBandBox.height, 900)
+  expect(toolRailBandBox.width).toBeGreaterThanOrEqual(60)
+  expect(toolRailBandBox.width).toBeLessThanOrEqual(90)
+  await expectDeepBlue(classRailBand)
+  await expectDeepBlue(toolRailBand)
+
+  // The podium stays centered in the teaching area and is visibly smaller than a
+  // row of desks; desks retain a card-like teaching-table scale below it.
+  expectCloseTo(podium.x + podium.width / 2, initialCanvas.x + initialCanvas.width / 2, 3)
+  expect(podium.width / initialCanvas.width).toBeGreaterThan(0.18)
+  expect(podium.width / initialCanvas.width).toBeLessThan(0.36)
+  expect(podium.height).toBeGreaterThanOrEqual(48)
+  expect(podium.height).toBeLessThanOrEqual(100)
+  expect(firstDesk.width).toBeGreaterThanOrEqual(145)
+  expect(firstDesk.width).toBeLessThanOrEqual(205)
+  expect(firstDesk.height).toBeGreaterThanOrEqual(80)
+  expect(firstDesk.height).toBeLessThanOrEqual(125)
+  expect(firstDesk.y).toBeGreaterThan(podium.y + podium.height)
+  await expect(canvas(page).getByTestId('seat').first()).toBeVisible()
+  const firstSeat = await canvas(page).getByTestId('seat').first().boundingBox()
+  if (!firstSeat) throw new Error('概念图课桌缺少可测量座位')
+  expect(firstSeat.width).toBeGreaterThanOrEqual(60)
+  expect(firstSeat.width).toBeLessThanOrEqual(95)
+  expect(firstSeat.height).toBeGreaterThanOrEqual(48)
+  expect(firstSeat.height).toBeLessThanOrEqual(85)
+  await expect(canvas(page).getByRole('article').first()).toHaveCSS('transform', 'none')
+
+  const toolNavigation = page.getByRole('navigation', { name: '班级工具' })
+  for (const tool of ['排座 / 移位', '编辑教室', '录入学生', '成绩']) {
+    const control = toolNavigation.getByRole('button', { name: tool })
+    await expect(control).toContainText(tool)
+    await expect(control.locator('svg')).toHaveCount(1)
+  }
 
   for (const tool of ['排座 / 移位', '编辑教室', '录入学生', '成绩']) {
     await page.getByRole('button', { name: tool }).click()
     const currentCanvas = await canvas(page).boundingBox()
     const currentPanel = await toolPanel(page).boundingBox()
-    expect(currentCanvas).not.toBeNull()
-    expect(currentPanel).not.toBeNull()
     if (!currentCanvas || !currentPanel) throw new Error('切换工具后工作台区域丢失')
-    expect(currentCanvas).toEqual(initialCanvas)
-    expect(currentPanel.x).toBe(initialToolPanel.x)
-    expect(currentPanel.width).toBe(initialToolPanel.width)
+    expectSameBox(currentCanvas, initialCanvas)
+    expectSameBox(currentPanel, initialToolPanel)
   }
 })
 
@@ -115,7 +206,7 @@ test('desktop rails collapse independently and return space to the canvas', asyn
   await expect.poll(async () => (await canvas(page).boundingBox())?.width).toBeGreaterThan(before.width)
 })
 
-test('responsive rails are overlay drawers with usable focus and no page overflow', async ({ page }) => {
+test('375×812 uses bounded overlay drawers and never overflows the page horizontally', async ({ page }) => {
   await page.setViewportSize({ width: 1024, height: 768 })
   await page.goto('/')
   await createClass(page, '响应式班级')
@@ -126,14 +217,46 @@ test('responsive rails are overlay drawers with usable focus and no page overflo
   }
 
   await page.getByRole('button', { name: '打开班级轨道' }).click()
-  const drawer = rail(page, 'class')
-  await expect(drawer).toHaveAttribute('data-overlay', 'true')
-  const close = drawer.getByRole('button', { name: '关闭班级轨道' })
+  const classDrawer = rail(page, 'class')
+  await expect(classDrawer).toHaveAttribute('data-overlay', 'true')
+  await expect(page.getByTestId('drawer-backdrop')).toBeVisible()
+  const classPanel = page.getByTestId('class-panel')
+  await expect.poll(async () => {
+    const x = (await classPanel.boundingBox())?.x
+    return x !== undefined && Math.abs(x) <= 2
+  }).toBe(true)
+  const classPanelBox = await classPanel.boundingBox()
+  expect(classPanelBox).not.toBeNull()
+  if (!classPanelBox) throw new Error('班级抽屉不可测量')
+  expectCloseTo(classPanelBox.x, 0)
+  expect(classPanelBox.width).toBeLessThanOrEqual(375)
+  expectCloseTo(classPanelBox.height, 812)
+  const close = classDrawer.getByRole('button', { name: '关闭班级轨道' })
   await close.focus()
   await expect(close).toBeFocused()
   await page.keyboard.press('Escape')
   await expect(page.getByRole('button', { name: '打开班级轨道' })).toBeFocused()
   await expect(page.getByTestId('class-panel')).toHaveAttribute('aria-hidden', 'true')
+  await expect(page.getByTestId('drawer-backdrop')).toBeHidden()
+
+  await page.getByRole('button', { name: '打开工具轨道' }).click()
+  const toolDrawer = rail(page, 'tool')
+  await expect(toolDrawer).toHaveAttribute('data-overlay', 'true')
+  await expect(page.getByTestId('drawer-backdrop')).toBeVisible()
+  await expect.poll(async () => {
+    const box = await toolPanel(page).boundingBox()
+    return Boolean(box && Math.abs(375 - (box.x + box.width)) <= 2)
+  }).toBe(true)
+  const toolPanelBox = await toolPanel(page).boundingBox()
+  expect(toolPanelBox).not.toBeNull()
+  if (!toolPanelBox) throw new Error('工具抽屉不可测量')
+  expectCloseTo(toolPanelBox.x + toolPanelBox.width, 375)
+  expect(toolPanelBox.width).toBeLessThanOrEqual(375)
+  expectCloseTo(toolPanelBox.height, 812)
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+  await page.keyboard.press('Escape')
+  await expect(page.getByTestId('drawer-backdrop')).toBeHidden()
+  await expect(page.getByRole('navigation', { name: '班级工具' })).toBeHidden()
 })
 
 test('seat, delete, and realign remain operational through the tool rail', async ({ page }) => {
