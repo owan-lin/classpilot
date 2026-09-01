@@ -265,9 +265,11 @@ function App({
     window.matchMedia("(min-width: 1025px)").matches,
   );
   const [layoutMode, setLayoutMode] = useState<LayoutMode>("snap");
+  const [canvasZoom, setCanvasZoom] = useState(1);
   const [activeDeskId, setActiveDeskId] = useState<string>();
   const [selectedId, setSelectedId] = useState<string>();
   const [profile, setProfile] = useState<StudentRecord>();
+  const [profileTab, setProfileTab] = useState<"profile" | "grades">("profile");
   const [studentForm, setStudentForm] = useState(emptyStudent);
   const [studentError, setStudentError] = useState("");
   const [editingStudent, setEditingStudent] = useState<string>();
@@ -455,6 +457,15 @@ function App({
       delete document.documentElement.dataset.profileGenderLabel;
     };
   }, [profile]);
+  useEffect(() => {
+    if (!profile) return;
+    setProfileTab("profile");
+    setGradeForm((current) =>
+      current.studentId === profile.id
+        ? current
+        : { ...emptyGrade, studentId: profile.id },
+    );
+  }, [profile?.id]);
 
   const active = classes.find((item) => item.id === classId);
   const stage = useMemo(() => {
@@ -489,11 +500,11 @@ function App({
       const visibleWidth = scroller.getBoundingClientRect().width;
       scroller.scrollLeft = Math.max(
         0,
-        mainGridCenter + paddingLeft - visibleWidth / 2,
+        mainGridCenter * canvasZoom + paddingLeft - visibleWidth / 2,
       );
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [active, classRailOpen, mainGridCenter, stage.width, toolRailOpen]);
+  }, [active, canvasZoom, classRailOpen, mainGridCenter, stage.width, toolRailOpen]);
   const bySeat = useMemo(
     () =>
       new Map(draft?.assignments.map((item) => [item.seatId, item.studentId])),
@@ -749,16 +760,38 @@ function App({
     );
   }
   function align() {
-    if (!draft || !active) return;
-    const positions = alignedDeskPositions(draft.desks, active, stage);
-    change((current) => ({
-      ...current,
-      desks: current.desks.map((desk, index) => ({
-        ...desk,
-        ...positions[index],
-      })),
-    }));
+    if (!active) return;
+    change((current) => {
+      const positions = alignedDeskPositions(current.desks, active, stage);
+      // Reordering is a pure coordinate operation.  Keeping this guard here
+      // prevents a malformed layout result from ever changing desk count.
+      if (positions.length !== current.desks.length) return current;
+      return {
+        ...current,
+        desks: current.desks.map((desk, index) => ({
+          ...desk,
+          ...positions[index],
+        })),
+      };
+    });
     setMessage("课桌已按网格对齐（班级设置）");
+  }
+  function setZoom(next: number) {
+    setCanvasZoom(Math.min(1.5, Math.max(0.5, Math.round(next * 100) / 100)));
+  }
+  function fitCanvas() {
+    const scroller = canvasScrollRef.current;
+    if (!scroller) return;
+    const styles = window.getComputedStyle(scroller);
+    const availableWidth =
+      scroller.clientWidth -
+      Number.parseFloat(styles.paddingLeft) -
+      Number.parseFloat(styles.paddingRight);
+    const availableHeight =
+      scroller.clientHeight -
+      Number.parseFloat(styles.paddingTop) -
+      Number.parseFloat(styles.paddingBottom);
+    setZoom(Math.min(availableWidth / stage.width, availableHeight / stage.height));
   }
   function beginMove(event: PointerEvent<HTMLElement>, desk: DeskRecord) {
     if (view !== "room" || !canvasRef.current) return;
@@ -842,7 +875,7 @@ function App({
         ...(gradeForm.note ? { note: gradeForm.note } : {}),
       });
       setGrades(await repository.listGrades(classId));
-      setGradeForm(emptyGrade);
+      setGradeForm(profile ? { ...emptyGrade, studentId: profile.id } : emptyGrade);
       setMessage("成绩已保存");
     } catch (error: unknown) {
       setMessage(error instanceof Error ? error.message : "成绩保存失败");
@@ -864,6 +897,20 @@ function App({
   const classroomCanvas = active && (
     <section ref={canvasScrollRef} className="canvas-scroll" data-testid="classroom-canvas">
       <div
+        data-testid="canvas-zoom"
+        role="group"
+        aria-label="画布缩放"
+        aria-valuemin={50}
+        aria-valuemax={150}
+        aria-valuenow={Math.round(canvasZoom * 100)}
+        className="canvas-zoom"
+      >
+        <button type="button" aria-label="缩小画布" onClick={() => setZoom(canvasZoom - 0.1)}>−</button>
+        <button type="button" aria-label="重置画布缩放" onClick={() => setCanvasZoom(1)}>{Math.round(canvasZoom * 100)}%</button>
+        <button type="button" aria-label="放大画布" onClick={() => setZoom(canvasZoom + 0.1)}>+</button>
+        <button type="button" aria-label="适配画布" onClick={fitCanvas}>适配</button>
+      </div>
+      <div
         ref={canvasRef}
         className={`canvas view-${view} ${view === "room" && layoutMode === "snap" ? "snap-grid" : ""}`}
         role="region"
@@ -876,6 +923,7 @@ function App({
           width: `${stage.width}px`,
           height: `${stage.height}px`,
           aspectRatio: "auto",
+          zoom: canvasZoom,
         } as CSSProperties}
       >
         <div className="podium" data-testid="podium" aria-label="讲台" style={{ left: `${(mainGridCenter / stage.width) * 100}%` }} />
@@ -942,9 +990,13 @@ function App({
                       }
                       onDragOver={(event) => event.preventDefault()}
                       onDrop={(event) => drop(event, seatId)}
-                      onClick={() =>
-                        view === "seating" && seat(seatId, student)
-                      }
+                      onClick={() => {
+                        if (student && !(view === "seating" && selectedId)) {
+                          setProfile(student);
+                          return;
+                        }
+                        if (view === "seating") seat(seatId, student);
+                      }}
                       className={
                         student
                           ? `seat occupied ${selectedId === student.id ? "selected" : ""}`
@@ -1178,91 +1230,21 @@ function App({
       </section>
     ) : (
       <section className="student-workspace">
-        <form
-          className="student-form student-form--grades"
-          onSubmit={saveGrade}
-        >
-          <h2>录入成绩</h2>
-          <label>
-            学生
-            <select
-              aria-label="成绩学生"
-              value={gradeForm.studentId}
-              onChange={(event) =>
-                setGradeForm({ ...gradeForm, studentId: event.target.value })
-              }
-            >
-              <option value="">选择学生</option>
-              {students.map((student) => (
-                <option key={student.id} value={student.id}>
-                  {student.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            学科
-            <input
-              aria-label="学科"
-              value={gradeForm.subject}
-              onChange={(event) =>
-                setGradeForm({ ...gradeForm, subject: event.target.value })
-              }
-            />
-          </label>
-          <label>
-            考试
-            <input
-              aria-label="考试"
-              value={gradeForm.examName}
-              onChange={(event) =>
-                setGradeForm({ ...gradeForm, examName: event.target.value })
-              }
-            />
-          </label>
-          <label>
-            日期
-            <input
-              type="date"
-              aria-label="考试日期"
-              value={gradeForm.examDate}
-              onChange={(event) =>
-                setGradeForm({ ...gradeForm, examDate: event.target.value })
-              }
-            />
-          </label>
-          <label>
-            得分
-            <input
-              type="number"
-              aria-label="得分"
-              value={gradeForm.score}
-              onChange={(event) =>
-                setGradeForm({ ...gradeForm, score: event.target.value })
-              }
-            />
-          </label>
-          <label>
-            满分
-            <input
-              type="number"
-              aria-label="满分"
-              value={gradeForm.fullScore}
-              onChange={(event) =>
-                setGradeForm({ ...gradeForm, fullScore: event.target.value })
-              }
-            />
-          </label>
-          <div className="form-actions form-actions--footer">
-            <button type="submit" className="primary">
-              保存成绩
-            </button>
-          </div>
-        </form>
         <section className="roster">
           <h2>
             成绩记录 <span>{grades.length}</span>
           </h2>
+          <p>选择学生后，可在档案弹窗查看并录入成绩。</p>
+          <ul>
+            {students.map((student) => (
+              <li key={student.id}>
+                <button type="button" onClick={() => setProfile(student)}>
+                  <b>{student.name}</b>
+                  <span>{grades.filter((grade) => grade.studentId === student.id).length} 条成绩</span>
+                </button>
+              </li>
+            ))}
+          </ul>
         </section>
         <GradeTools
           csv={gradeCsv}
@@ -1455,38 +1437,45 @@ function App({
               <X />
             </button>
             <h2>{profile.name}</h2>
-            <dl>
-              <div>
-                <dt>性别</dt>
-                <dd
-                  data-testid="gender-status"
-                  {...studentGenderAttributes(profile.gender)}
-                >
-                  {studentGenderLabel(profile.gender)}
-                </dd>
-              </div>
-              <div>
-                <dt>学号</dt>
-                <dd>{profile.studentNo || "未填写"}</dd>
-              </div>
-            </dl>
-            <p>{profile.note || "—"}</p>
-            <div className="form-actions">
-              <button
-                className="primary"
-                type="button"
-                onClick={() => editStudent(profile)}
-              >
-                编辑档案
-              </button>
-              <button
-                className="danger"
-                type="button"
-                onClick={() => void deleteStudent(profile)}
-              >
-                删除学生
-              </button>
+            <div role="tablist" aria-label="学生档案内容">
+              <button type="button" role="tab" aria-selected={profileTab === "profile"} onClick={() => setProfileTab("profile")}>档案</button>
+              <button type="button" role="tab" aria-selected={profileTab === "grades"} onClick={() => setProfileTab("grades")}>成绩</button>
             </div>
+            {profileTab === "profile" ? (
+              <section role="tabpanel" aria-label="学生档案">
+                <dl>
+                  <div>
+                    <dt>性别</dt>
+                    <dd data-testid="gender-status" {...studentGenderAttributes(profile.gender)}>{studentGenderLabel(profile.gender)}</dd>
+                  </div>
+                  <div>
+                    <dt>学号</dt>
+                    <dd>{profile.studentNo || "未填写"}</dd>
+                  </div>
+                </dl>
+                <p>{profile.note || "—"}</p>
+                <div className="form-actions">
+                  <button className="primary" type="button" onClick={() => editStudent(profile)}>编辑档案</button>
+                  <button className="danger" type="button" onClick={() => void deleteStudent(profile)}>删除学生</button>
+                </div>
+              </section>
+            ) : (
+              <section className="profile-grade-card" role="tabpanel" aria-label={`${profile.name} 的成绩`}>
+                <h3>成绩记录</h3>
+                {grades.filter((grade) => grade.studentId === profile.id).length ? (
+                  <ul>{grades.filter((grade) => grade.studentId === profile.id).map((grade) => <li key={grade.id}>{grade.subject} · {grade.examName} · {grade.score}/{grade.fullScore}</li>)}</ul>
+                ) : <p>暂无成绩记录</p>}
+                <form onSubmit={saveGrade}>
+                  <h3>录入成绩</h3>
+                  <label>学科<input aria-label="档案成绩学科" value={gradeForm.subject} onChange={(event) => setGradeForm({ ...gradeForm, subject: event.target.value })} /></label>
+                  <label>考试<input aria-label="档案成绩考试" value={gradeForm.examName} onChange={(event) => setGradeForm({ ...gradeForm, examName: event.target.value })} /></label>
+                  <label>日期<input type="date" aria-label="档案成绩日期" value={gradeForm.examDate} onChange={(event) => setGradeForm({ ...gradeForm, examDate: event.target.value })} /></label>
+                  <label>得分<input type="number" aria-label="档案成绩得分" value={gradeForm.score} onChange={(event) => setGradeForm({ ...gradeForm, score: event.target.value })} /></label>
+                  <label>满分<input type="number" aria-label="档案成绩满分" value={gradeForm.fullScore} onChange={(event) => setGradeForm({ ...gradeForm, fullScore: event.target.value })} /></label>
+                  <button type="submit" className="primary">保存成绩</button>
+                </form>
+              </section>
+            )}
           </section>
         </div>
       )}
