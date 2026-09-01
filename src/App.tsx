@@ -465,7 +465,9 @@ function App({
     return classroomStageFor({
       rows,
       desksPerRow,
-      sideDeskCount: Math.max(0, regular - rows * desksPerRow, special),
+      // Both excess regular desks and special desks consume the shared side
+      // wings; the stage must reserve room for their balanced distribution.
+      sideDeskCount: Math.max(0, regular - rows * desksPerRow) + special,
     });
   }, [active?.rows, active?.desksPerRow, draft?.desks]);
   const bySeat = useMemo(
@@ -1383,7 +1385,10 @@ function App({
               {label}
             </button>
           ))}
-          <button type="button" className="tab" aria-label="班级设置" onClick={openSettings}>班级设置</button>
+          <button type="button" className="tab" aria-label="班级设置" onClick={openSettings}>
+            <Settings aria-hidden="true" />
+            班级设置
+          </button>
         </nav>
         <section
           data-testid="tool-panel"
