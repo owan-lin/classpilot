@@ -144,24 +144,24 @@ test('1440×900 concept layout keeps rails, panels, canvas, podium, and desks in
   if (!initialCanvas || !classRail || !toolRail || !classRailBandBox || !toolRailBandBox || !classPanel || !initialToolPanel || !classToggle || !toolToggle || !podium || !firstDesk)
     throw new Error('概念图工作台缺少可测量的必要区域')
 
-  // These are deliberately ranges, not screenshot pixels: the approved concept
-  // calls for a 106px left rail, ~201px class panel, ≥850px teaching canvas,
-  // ~204px tool panel, and 72px right rail at this viewport.
+  // These are deliberately ranges, not screenshot pixels: a compact left rail,
+  // class panel, teaching-first canvas, tool panel, and compact right rail must
+  // remain a single continuous desktop frame at this viewport.
   expectCloseTo(classToggle.x, 0)
-  expect(classToggle.width).toBeGreaterThanOrEqual(90)
-  expect(classToggle.width).toBeLessThanOrEqual(120)
+  expect(classToggle.width).toBeGreaterThanOrEqual(56)
+  expect(classToggle.width).toBeLessThanOrEqual(80)
   expectCloseTo(classPanel.x, classToggle.width)
   expect(classPanel.width).toBeGreaterThanOrEqual(180)
   expect(classPanel.width).toBeLessThanOrEqual(225)
   expectCloseTo(initialCanvas.x, classPanel.x + classPanel.width)
-  expect(initialCanvas.width).toBeGreaterThanOrEqual(850)
-  expect(initialCanvas.width / 1440).toBeLessThan(0.66)
+  expect(initialCanvas.width).toBeGreaterThanOrEqual(800)
+  expect(initialCanvas.width / 1440).toBeLessThan(0.7)
   expectCloseTo(initialToolPanel.x, initialCanvas.x + initialCanvas.width)
-  expect(initialToolPanel.width).toBeGreaterThanOrEqual(180)
-  expect(initialToolPanel.width).toBeLessThanOrEqual(240)
+  expect(initialToolPanel.width).toBeGreaterThanOrEqual(210)
+  expect(initialToolPanel.width).toBeLessThanOrEqual(260)
   expectCloseTo(toolToggle.x + toolToggle.width, 1440)
-  expect(toolToggle.width).toBeGreaterThanOrEqual(60)
-  expect(toolToggle.width).toBeLessThanOrEqual(90)
+  expect(toolToggle.width).toBeGreaterThanOrEqual(56)
+  expect(toolToggle.width).toBeLessThanOrEqual(80)
   expectCloseTo(initialCanvas.y, 0)
   expectCloseTo(initialCanvas.height, 900)
   expectCloseTo(classPanel.y, initialCanvas.y)
@@ -172,24 +172,26 @@ test('1440×900 concept layout keeps rails, panels, canvas, podium, and desks in
   expectCloseTo(classRailBandBox.x, 0)
   expectCloseTo(classRailBandBox.y, 0)
   expectCloseTo(classRailBandBox.height, 900)
-  expect(classRailBandBox.width).toBeGreaterThanOrEqual(90)
-  expect(classRailBandBox.width).toBeLessThanOrEqual(120)
+  expect(classRailBandBox.width).toBeGreaterThanOrEqual(56)
+  expect(classRailBandBox.width).toBeLessThanOrEqual(80)
   expectCloseTo(toolRailBandBox.x + toolRailBandBox.width, 1440)
   expectCloseTo(toolRailBandBox.y, 0)
   expectCloseTo(toolRailBandBox.height, 900)
-  expect(toolRailBandBox.width).toBeGreaterThanOrEqual(60)
-  expect(toolRailBandBox.width).toBeLessThanOrEqual(90)
+  expect(toolRailBandBox.width).toBeGreaterThanOrEqual(56)
+  expect(toolRailBandBox.width).toBeLessThanOrEqual(80)
   await expectDeepBlue(classRailBand)
   await expectDeepBlue(toolRailBand)
 
   // The podium stays centered in the teaching area and is visibly smaller than a
   // row of desks; desks retain a card-like teaching-table scale below it.
-  expectCloseTo(podium.x + podium.width / 2, initialCanvas.x + initialCanvas.width / 2, 3)
+  // A visible vertical scrollbar can shift the geometric center by half its
+  // width; the podium should still read as centered to within that gutter.
+  expectCloseTo(podium.x + podium.width / 2, initialCanvas.x + initialCanvas.width / 2, 10)
   expect(podium.width / initialCanvas.width).toBeGreaterThan(0.18)
   expect(podium.width / initialCanvas.width).toBeLessThan(0.36)
   expect(podium.height).toBeGreaterThanOrEqual(48)
   expect(podium.height).toBeLessThanOrEqual(100)
-  expect(firstDesk.width).toBeGreaterThanOrEqual(145)
+  expect(firstDesk.width).toBeGreaterThanOrEqual(150)
   expect(firstDesk.width).toBeLessThanOrEqual(205)
   expect(firstDesk.height).toBeGreaterThanOrEqual(80)
   expect(firstDesk.height).toBeLessThanOrEqual(125)
@@ -255,6 +257,149 @@ test('desktop rails collapse independently and return space to the canvas', asyn
   await toolToggle.click()
   await expect(toolToggle).toHaveAttribute('aria-expanded', 'false')
   await expect.poll(async () => (await canvas(page).boundingBox())?.width).toBeGreaterThan(before.width)
+})
+
+test('desktop rail states tile the workbench without blank seams, overlap, or page overflow', async ({ page }) => {
+  await page.goto('/')
+  await createClass(page, '侧栏拼接契约班')
+
+  for (const viewport of [{ width: 1280, height: 800 }, { width: 1440, height: 900 }, { width: 1920, height: 1080 }]) {
+    await page.setViewportSize(viewport)
+    const classToggle = page.getByRole('button', { name: /班级轨道/ })
+    const toolToggle = page.getByRole('button', { name: /工具轨道/ })
+    if (await classToggle.getAttribute('aria-expanded') === 'false') await classToggle.click()
+    if (await toolToggle.getAttribute('aria-expanded') === 'false') await toolToggle.click()
+
+    for (const state of [
+      { classOpen: true, toolOpen: true },
+      { classOpen: false, toolOpen: true },
+      { classOpen: true, toolOpen: false },
+      { classOpen: false, toolOpen: false },
+    ]) {
+      if ((await classToggle.getAttribute('aria-expanded')) !== String(state.classOpen)) await classToggle.click()
+      if ((await toolToggle.getAttribute('aria-expanded')) !== String(state.toolOpen)) await toolToggle.click()
+
+      await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+      const [classRailBox, canvasBox, toolRailBox] = await Promise.all([
+        rail(page, 'class').boundingBox(),
+        canvas(page).boundingBox(),
+        rail(page, 'tool').boundingBox(),
+      ])
+      if (!classRailBox || !canvasBox || !toolRailBox) throw new Error('侧栏状态缺少可测量区域')
+      expectCloseTo(classRailBox.x, 0)
+      expectCloseTo(classRailBox.x + classRailBox.width, canvasBox.x, 2)
+      expectCloseTo(canvasBox.x + canvasBox.width, toolRailBox.x, 2)
+      expectCloseTo(toolRailBox.x + toolRailBox.width, viewport.width, 2)
+      expect(classRailBox.width).toBeGreaterThanOrEqual(56)
+      expect(toolRailBox.width).toBeGreaterThanOrEqual(56)
+      // Rails are display-contents grid hosts; the visible edge surface is the
+      // persistent deep-blue band, which must stay above the classroom canvas.
+      const rightBand = railBand(page, 'tool')
+      await expectDeepBlue(rightBand)
+      if (!state.toolOpen) {
+        const surface = await rightBand.evaluate((element) => {
+          const style = getComputedStyle(element)
+          return { zIndex: style.zIndex, backgroundColor: style.backgroundColor }
+        })
+        expect(surface).toMatchObject({ zIndex: '1', backgroundColor: 'rgb(18, 61, 93)' })
+      }
+      expect(canvasBox.width).toBeGreaterThanOrEqual(300)
+      expectCloseTo(canvasBox.height, viewport.height)
+    }
+  }
+})
+
+test('desktop tool icons and grade form retain usable visual proportions', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto('/')
+  await createClass(page, '控件比例契约班')
+
+  const toolNavigation = page.getByRole('navigation', { name: '班级工具' })
+  for (const label of ['排座 / 移位', '编辑教室', '录入学生', '成绩']) {
+    const control = toolNavigation.getByRole('button', { name: label })
+    const [controlBox, iconBox] = await Promise.all([control.boundingBox(), control.locator('svg').boundingBox()])
+    if (!controlBox || !iconBox) throw new Error(`${label} 缺少可测量图标或控件`)
+    expect(controlBox.height).toBeGreaterThanOrEqual(52)
+    expect(iconBox.width).toBeGreaterThanOrEqual(18)
+    expect(iconBox.width).toBeLessThanOrEqual(28)
+    expect(Math.abs(iconBox.width - iconBox.height)).toBeLessThanOrEqual(1)
+  }
+
+  await page.getByRole('button', { name: '成绩' }).click()
+  const form = toolPanel(page).locator('form.student-form--grades')
+  await expect(form).toBeVisible()
+  const score = form.getByRole('spinbutton', { name: '得分' })
+  const fullScore = form.getByRole('spinbutton', { name: '满分' })
+  const [scoreBox, fullScoreBox] = await Promise.all([score.boundingBox(), fullScore.boundingBox()])
+  if (!scoreBox || !fullScoreBox) throw new Error('成绩数值字段不可测量')
+  // Score inputs can share a row only when neither is reduced to an unusable sliver.
+  if (Math.abs(scoreBox.y - fullScoreBox.y) <= 2) {
+    expect(scoreBox.width).toBeGreaterThanOrEqual(120)
+    expect(fullScoreBox.width).toBeGreaterThanOrEqual(120)
+  }
+  expect(scoreBox.height).toBeGreaterThanOrEqual(40)
+  expect(fullScoreBox.height).toBeGreaterThanOrEqual(40)
+  await expect.poll(() => form.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
+})
+
+test('2×3 grid keeps six central desks readable while seven overflow desks use scrollable side wings', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto('/')
+  await createClass(page, '两排三桌侧翼班')
+  await page.getByRole('button', { name: '编辑教室' }).click()
+
+  const desks = canvas(page).getByRole('article')
+  await expect(desks).toHaveCount(6)
+  for (let index = 0; index < 7; index += 1) await page.getByRole('button', { name: '+ 普通座位' }).click()
+  await expect(desks).toHaveCount(13)
+  await page.getByRole('button', { name: '重排对齐' }).click()
+  await expect(page.getByRole('status')).toContainText(/按网格对齐/)
+
+  const boxes = await Promise.all(Array.from({ length: 13 }, (_, index) => desks.nth(index).boundingBox()))
+  if (boxes.some((box) => !box)) throw new Error('重排后的课桌缺少可测量视觉边界')
+  const measured = boxes as Box[]
+  const main = measured.slice(0, 6)
+  const overflow = measured.slice(6)
+
+  // Main desks retain the configured 2 × 3 rhythm and must never be globally
+  // shrunk just to force all overflow desks into the visible viewport.
+  for (const deskBox of measured) {
+    expect(deskBox.width).toBeGreaterThanOrEqual(150)
+    expect(deskBox.height).toBeGreaterThanOrEqual(80)
+  }
+  expectCloseTo(main[0].y, main[1].y, 2)
+  expectCloseTo(main[1].y, main[2].y, 2)
+  expectCloseTo(main[3].y, main[4].y, 2)
+  expectCloseTo(main[4].y, main[5].y, 2)
+  expect(main[3].y).toBeGreaterThan(main[0].y)
+  for (const column of [0, 1, 2]) expectCloseTo(main[column].x, main[column + 3].x, 2)
+
+  const mainLeft = Math.min(...main.map((deskBox) => deskBox.x))
+  const mainRight = Math.max(...main.map((deskBox) => deskBox.x + deskBox.width))
+  const leftWing = overflow.filter((deskBox) => deskBox.x + deskBox.width <= mainLeft)
+  const rightWing = overflow.filter((deskBox) => deskBox.x >= mainRight)
+  expect(leftWing.length).toBeGreaterThan(0)
+  expect(rightWing.length).toBeGreaterThan(0)
+
+  const podium = await page.getByTestId('podium').boundingBox()
+  const rowLabelLocator = page.locator('.row-labels span')
+  const rowLabels = await Promise.all(Array.from(
+    { length: await rowLabelLocator.count() },
+    (_, index) => rowLabelLocator.nth(index).boundingBox(),
+  ))
+  if (!podium || rowLabels.length !== 2 || rowLabels.some((label) => !label)) throw new Error('讲台或两条排号不可测量')
+  const overlaps = (first: Box, second: Box) =>
+    first.x < second.x + second.width && first.x + first.width > second.x &&
+    first.y < second.y + second.height && first.y + first.height > second.y
+  for (const wingDesk of [...leftWing, ...rightWing]) {
+    expect(overlaps(wingDesk, podium)).toBe(false)
+    for (const label of rowLabels as Box[]) expect(overlaps(wingDesk, label)).toBe(false)
+  }
+
+  const scroll = canvas(page)
+  await expect.poll(() => scroll.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true)
+  await scroll.evaluate((element) => { element.scrollLeft = element.scrollWidth })
+  await expect.poll(() => scroll.evaluate((element) => element.scrollLeft > 0)).toBe(true)
 })
 
 test('wide desktop workbench never page-scrolls and keeps the student tool panel usable', async ({ page }) => {

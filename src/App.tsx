@@ -3,6 +3,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type FormEvent,
   type PointerEvent,
 } from "react";
@@ -281,6 +282,7 @@ function App({
   const [gradePreview, setGradePreview] =
     useState<ReturnType<typeof previewGradeCsv>>();
   const session = useRef<DraftSession | undefined>(undefined);
+  const canvasScrollRef = useRef<HTMLElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const classRailToggleRef = useRef<HTMLButtonElement>(null);
   const toolRailToggleRef = useRef<HTMLButtonElement>(null);
@@ -465,9 +467,33 @@ function App({
     return classroomStageFor({
       rows,
       desksPerRow,
-      sideDeskCount: Math.max(0, regular - rows * desksPerRow, special),
+      // Both excess regular desks and special desks consume the shared side
+      // wings; the stage must reserve room for their balanced distribution.
+      sideDeskCount: Math.max(0, regular - rows * desksPerRow) + special,
     });
   }, [active?.rows, active?.desksPerRow, draft?.desks]);
+  const mainGridWidth = active
+    ? active.desksPerRow * regularDeskSpec.width +
+      Math.max(0, active.desksPerRow - 1) * stage.gapX
+    : 0;
+  const mainGridCenter = active
+    ? stage.originX + mainGridWidth / 2
+    : stage.width / 2;
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      const scroller = canvasScrollRef.current;
+      if (!scroller || !active) return;
+      const paddingLeft = Number.parseFloat(
+        window.getComputedStyle(scroller).paddingLeft,
+      );
+      const visibleWidth = scroller.getBoundingClientRect().width;
+      scroller.scrollLeft = Math.max(
+        0,
+        mainGridCenter + paddingLeft - visibleWidth / 2,
+      );
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [active, classRailOpen, mainGridCenter, stage.width, toolRailOpen]);
   const bySeat = useMemo(
     () =>
       new Map(draft?.assignments.map((item) => [item.seatId, item.studentId])),
@@ -836,20 +862,24 @@ function App({
   }
 
   const classroomCanvas = active && (
-    <section className="canvas-scroll" data-testid="classroom-canvas">
+    <section ref={canvasScrollRef} className="canvas-scroll" data-testid="classroom-canvas">
       <div
         ref={canvasRef}
         className={`canvas view-${view} ${view === "room" && layoutMode === "snap" ? "snap-grid" : ""}`}
         role="region"
         aria-label={`${active.name} 教室座位画布`}
         style={{
-          width: `${stage.width / 10}%`,
+          "--canvas-stage-width": `${stage.width}px`,
+          "--canvas-stage-height": `${stage.height}px`,
+          // Stage coordinates are also CSS pixels.  Let the scroll container
+          // pan a large classroom instead of shrinking every desk to fit it.
+          width: `${stage.width}px`,
           height: `${stage.height}px`,
-          aspectRatio: `${stage.width} / ${stage.height}`,
-        }}
+          aspectRatio: "auto",
+        } as CSSProperties}
       >
-        <div className="podium" data-testid="podium" aria-label="讲台" />
-        <div className="row-labels" aria-hidden="true">{Array.from({ length: active.rows }, (_, index) => <span key={index} style={{ top: `${(stage.originY + index * (regularDeskSpec.height + stage.gapY)) / stage.height * 100}%` }}>第{index + 1}排</span>)}</div>
+        <div className="podium" data-testid="podium" aria-label="讲台" style={{ left: `${(mainGridCenter / stage.width) * 100}%` }} />
+        <div className="row-labels" aria-hidden="true">{Array.from({ length: active.rows }, (_, index) => <span key={index} style={{ left: `${((stage.originX - 36) / stage.width) * 100}%`, top: `${(stage.originY + index * (regularDeskSpec.height + stage.gapY)) / stage.height * 100}%` }}>第{index + 1}排</span>)}</div>
         {draft?.desks.map((desk, index) => {
           const position = transient[desk.id] ?? desk;
           return (
@@ -1383,7 +1413,10 @@ function App({
               {label}
             </button>
           ))}
-          <button type="button" className="tab" aria-label="班级设置" onClick={openSettings}>班级设置</button>
+          <button type="button" className="tab" aria-label="班级设置" onClick={openSettings}>
+            <Settings aria-hidden="true" />
+            班级设置
+          </button>
         </nav>
         <section
           data-testid="tool-panel"
