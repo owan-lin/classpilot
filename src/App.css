@@ -226,6 +226,7 @@ html[data-profile-gender="male"] .profile dl div:first-child dd,html[data-profil
   border: 1px solid #d9e4e6;
   border-radius: 6px;
   box-shadow: 0 4px 12px rgb(27 54 77 / 8%);
+  pointer-events: none;
 }
 .canvas-title b { font-size: 16px; }
 .canvas-scroll { padding: 82px 28px 28px; }
@@ -291,6 +292,7 @@ html[data-profile-gender="male"] .profile dl div:first-child dd,html[data-profil
   .class-rail > .rail-panel,
   .tool-rail > .tool-panel { padding: 72px 16px 24px; }
   .tool-rail > nav { display: none !important; }
+  .canvas-title { left: 68px; }
   .canvas-scroll { padding: 78px 16px 24px; }
 }
 
