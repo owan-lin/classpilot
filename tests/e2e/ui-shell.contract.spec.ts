@@ -184,12 +184,14 @@ test('1440×900 concept layout keeps rails, panels, canvas, podium, and desks in
 
   // The podium stays centered in the teaching area and is visibly smaller than a
   // row of desks; desks retain a card-like teaching-table scale below it.
-  expectCloseTo(podium.x + podium.width / 2, initialCanvas.x + initialCanvas.width / 2, 3)
+  // A visible vertical scrollbar can shift the geometric center by half its
+  // width; the podium should still read as centered to within that gutter.
+  expectCloseTo(podium.x + podium.width / 2, initialCanvas.x + initialCanvas.width / 2, 10)
   expect(podium.width / initialCanvas.width).toBeGreaterThan(0.18)
   expect(podium.width / initialCanvas.width).toBeLessThan(0.36)
   expect(podium.height).toBeGreaterThanOrEqual(48)
   expect(podium.height).toBeLessThanOrEqual(100)
-  expect(firstDesk.width).toBeGreaterThanOrEqual(145)
+  expect(firstDesk.width).toBeGreaterThanOrEqual(150)
   expect(firstDesk.width).toBeLessThanOrEqual(205)
   expect(firstDesk.height).toBeGreaterThanOrEqual(80)
   expect(firstDesk.height).toBeLessThanOrEqual(125)
@@ -338,6 +340,66 @@ test('desktop tool icons and grade form retain usable visual proportions', async
   expect(scoreBox.height).toBeGreaterThanOrEqual(40)
   expect(fullScoreBox.height).toBeGreaterThanOrEqual(40)
   await expect.poll(() => form.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
+})
+
+test('2×3 grid keeps six central desks readable while seven overflow desks use scrollable side wings', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto('/')
+  await createClass(page, '两排三桌侧翼班')
+  await page.getByRole('button', { name: '编辑教室' }).click()
+
+  const desks = canvas(page).getByRole('article')
+  await expect(desks).toHaveCount(6)
+  for (let index = 0; index < 7; index += 1) await page.getByRole('button', { name: '+ 普通座位' }).click()
+  await expect(desks).toHaveCount(13)
+  await page.getByRole('button', { name: '重排对齐' }).click()
+  await expect(page.getByRole('status')).toContainText(/按网格对齐/)
+
+  const boxes = await Promise.all(Array.from({ length: 13 }, (_, index) => desks.nth(index).boundingBox()))
+  if (boxes.some((box) => !box)) throw new Error('重排后的课桌缺少可测量视觉边界')
+  const measured = boxes as Box[]
+  const main = measured.slice(0, 6)
+  const overflow = measured.slice(6)
+
+  // Main desks retain the configured 2 × 3 rhythm and must never be globally
+  // shrunk just to force all overflow desks into the visible viewport.
+  for (const deskBox of measured) {
+    expect(deskBox.width).toBeGreaterThanOrEqual(150)
+    expect(deskBox.height).toBeGreaterThanOrEqual(80)
+  }
+  expectCloseTo(main[0].y, main[1].y, 2)
+  expectCloseTo(main[1].y, main[2].y, 2)
+  expectCloseTo(main[3].y, main[4].y, 2)
+  expectCloseTo(main[4].y, main[5].y, 2)
+  expect(main[3].y).toBeGreaterThan(main[0].y)
+  for (const column of [0, 1, 2]) expectCloseTo(main[column].x, main[column + 3].x, 2)
+
+  const mainLeft = Math.min(...main.map((deskBox) => deskBox.x))
+  const mainRight = Math.max(...main.map((deskBox) => deskBox.x + deskBox.width))
+  const leftWing = overflow.filter((deskBox) => deskBox.x + deskBox.width <= mainLeft)
+  const rightWing = overflow.filter((deskBox) => deskBox.x >= mainRight)
+  expect(leftWing.length).toBeGreaterThan(0)
+  expect(rightWing.length).toBeGreaterThan(0)
+
+  const podium = await page.getByTestId('podium').boundingBox()
+  const rowLabelLocator = page.locator('.row-labels span')
+  const rowLabels = await Promise.all(Array.from(
+    { length: await rowLabelLocator.count() },
+    (_, index) => rowLabelLocator.nth(index).boundingBox(),
+  ))
+  if (!podium || rowLabels.length !== 2 || rowLabels.some((label) => !label)) throw new Error('讲台或两条排号不可测量')
+  const overlaps = (first: Box, second: Box) =>
+    first.x < second.x + second.width && first.x + first.width > second.x &&
+    first.y < second.y + second.height && first.y + first.height > second.y
+  for (const wingDesk of [...leftWing, ...rightWing]) {
+    expect(overlaps(wingDesk, podium)).toBe(false)
+    for (const label of rowLabels as Box[]) expect(overlaps(wingDesk, label)).toBe(false)
+  }
+
+  const scroll = canvas(page)
+  await expect.poll(() => scroll.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true)
+  await scroll.evaluate((element) => { element.scrollLeft = element.scrollWidth })
+  await expect.poll(() => scroll.evaluate((element) => element.scrollLeft > 0)).toBe(true)
 })
 
 test('wide desktop workbench never page-scrolls and keeps the student tool panel usable', async ({ page }) => {

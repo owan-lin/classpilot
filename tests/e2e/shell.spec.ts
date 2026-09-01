@@ -349,6 +349,28 @@ test('动态座位画布允许 6×4 与 8×5 的有效班级参数', async ({ pa
   await expect(page.getByRole('region', { name: '八乘五班 教室座位画布' }).getByRole('article')).toHaveCount(40)
 })
 
+test('宽教室将溢出桌位留在可横向平移的画布中，而不压缩主网格桌子', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto('/')
+  await createClassWithLayout(page, '双翼画布班', 2, 3)
+  await page.getByRole('button', { name: '编辑教室' }).click()
+
+  for (let index = 0; index < 7; index += 1) await page.getByRole('button', { name: '+ 普通座位' }).click()
+  await page.getByRole('button', { name: '重排对齐' }).click()
+
+  const firstDeskBox = await desk(page, 1).boundingBox()
+  expect(firstDeskBox).not.toBeNull()
+  if (!firstDeskBox) throw new Error('主网格课桌没有可测量尺寸')
+  expect(firstDeskBox.width).toBeGreaterThanOrEqual(150)
+  expect(firstDeskBox.height).toBeGreaterThanOrEqual(80)
+
+  const dimensions = await page.getByTestId('classroom-canvas').evaluate((element) => ({
+    clientWidth: element.clientWidth,
+    scrollWidth: element.scrollWidth,
+  }))
+  expect(dimensions.scrollWidth).toBeGreaterThan(dimensions.clientWidth)
+})
+
 test('拖动中的课桌位于其余课桌之上，并按实际 canvas 坐标提交移动', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto('/')

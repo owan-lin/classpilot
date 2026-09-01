@@ -293,3 +293,29 @@ html[data-profile-gender="male"] .profile dl div:first-child dd,html[data-profil
   .tool-rail > nav { display: none !important; }
   .canvas-scroll { padding: 78px 16px 24px; }
 }
+
+/* The classroom is an interactive workspace, not a responsive illustration.
+   Preserve its coordinate scale and use the canvas scroller for wide layouts;
+   otherwise a wide pair of overflow wings compresses desks below a usable size. */
+.canvas-scroll > .canvas {
+  width: var(--canvas-stage-width, auto) !important;
+  height: var(--canvas-stage-height, auto) !important;
+  min-width: 1000px !important;
+  min-height: 690px !important;
+  aspect-ratio: auto !important;
+}
+
+/* The stage is a real drafting surface, not a responsive image.  Its inline
+   height and aspect ratio resolve to the domain stage dimensions; when wings
+   make it wider than the workbench, scroll the surface rather than shrinking
+   desks and their text into unreadable cards. */
+@media (min-width: 1025px) {
+  .canvas-scroll {
+    display: block;
+    overflow: auto !important;
+    overscroll-behavior: contain;
+  }
+  .canvas-scroll > .canvas {
+    margin-inline: auto;
+  }
+}
