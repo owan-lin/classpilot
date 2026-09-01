@@ -404,6 +404,16 @@ function App({
     setToolRailOpen(false);
     requestAnimationFrame(() => toolRailToggleRef.current?.focus());
   }
+  function toggleClassRail() {
+    const opening = !classRailOpen;
+    if (opening && !desktopViewport) setToolRailOpen(false);
+    setClassRailOpen(opening);
+  }
+  function toggleToolRail() {
+    const opening = !toolRailOpen;
+    if (opening && !desktopViewport) setClassRailOpen(false);
+    setToolRailOpen(opening);
+  }
   function activateTool(next: View) {
     setView(next);
     setSelectedId(undefined);
@@ -1288,7 +1298,7 @@ function App({
           aria-label={classRailOpen || desktopViewport ? "折叠班级轨道" : "打开班级轨道"}
           aria-controls="class-rail"
           aria-expanded={classRailOpen}
-          onClick={() => setClassRailOpen(!classRailOpen)}
+          onClick={toggleClassRail}
         >
           <LayoutGrid />
         </button>
@@ -1379,7 +1389,7 @@ function App({
           aria-label={toolRailOpen || desktopViewport ? "折叠工具轨道" : "打开工具轨道"}
           aria-controls="tool-rail"
           aria-expanded={toolRailOpen}
-          onClick={() => setToolRailOpen(!toolRailOpen)}
+          onClick={toggleToolRail}
         >
           <Settings />
         </button>
