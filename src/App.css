@@ -99,3 +99,9 @@ html[data-profile-gender="male"] .profile dl div:first-child dd,html[data-profil
   .view-seating .desk{max-height:none}
   .canvas>.podium{width:380px;height:124px;padding-top:42px;font-size:20px}
 }
+
+@media(min-width:1025px){
+  .class-rail>.rail-panel{grid-row:1/-1}
+  .view-seating .desk{min-height:110px}
+  .view-seating .desk>header{visibility:visible;box-sizing:border-box;height:28px;min-height:28px;padding:4px 8px;color:#614221;border-bottom:1px solid #d3ac78;font-size:11px}
+}
