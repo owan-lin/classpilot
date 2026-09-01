@@ -9,8 +9,10 @@ import {
 } from "react";
 import {
   BarChart3,
+  Check,
   Grip,
   LayoutGrid,
+  Maximize2,
   Plus,
   RotateCcw,
   PencilRuler,
@@ -19,6 +21,8 @@ import {
   UserRound,
   Users,
   X,
+  ZoomIn,
+  ZoomOut,
 } from "lucide-react";
 import { classRepository } from "./data/repository";
 import {
@@ -457,16 +461,6 @@ function App({
       delete document.documentElement.dataset.profileGenderLabel;
     };
   }, [profile]);
-  useEffect(() => {
-    if (!profile) return;
-    setProfileTab("profile");
-    setGradeForm((current) =>
-      current.studentId === profile.id
-        ? current
-        : { ...emptyGrade, studentId: profile.id },
-    );
-  }, [profile?.id]);
-
   const active = classes.find((item) => item.id === classId);
   const stage = useMemo(() => {
     const rows = active?.rows ?? 2,
@@ -663,6 +657,11 @@ function App({
     setProfile(undefined);
     activateTool("students");
   }
+  function openProfile(student: StudentRecord) {
+    setProfileTab("profile");
+    setGradeForm({ ...emptyGrade, studentId: student.id });
+    setProfile(student);
+  }
   async function deleteStudent(student: StudentRecord) {
     if (!confirm("删除这名学生？")) return;
     change((current) => ({
@@ -678,7 +677,7 @@ function App({
   }
   function seat(seatId: string, occupant?: StudentRecord) {
     if (!selectedId)
-      return occupant ? setProfile(occupant) : setMessage("请选择一名学生");
+      return occupant ? openProfile(occupant) : setMessage("请选择一名学生");
     const incoming = byId.get(selectedId);
     if (
       occupant &&
@@ -905,10 +904,10 @@ function App({
         aria-valuenow={Math.round(canvasZoom * 100)}
         className="canvas-zoom"
       >
-        <button type="button" aria-label="缩小画布" onClick={() => setZoom(canvasZoom - 0.1)}>−</button>
-        <button type="button" aria-label="重置画布缩放" onClick={() => setCanvasZoom(1)}>{Math.round(canvasZoom * 100)}%</button>
-        <button type="button" aria-label="放大画布" onClick={() => setZoom(canvasZoom + 0.1)}>+</button>
-        <button type="button" aria-label="适配画布" onClick={fitCanvas}>适配</button>
+        <button type="button" aria-label="缩小画布" title="缩小画布" onClick={() => setZoom(canvasZoom - 0.1)}><ZoomOut aria-hidden="true" /></button>
+        <button type="button" aria-label="重置画布缩放" title="重置为 100%" onClick={() => setCanvasZoom(1)}><RotateCcw aria-hidden="true" /><span>{Math.round(canvasZoom * 100)}%</span></button>
+        <button type="button" aria-label="放大画布" title="放大画布" onClick={() => setZoom(canvasZoom + 0.1)}><ZoomIn aria-hidden="true" /></button>
+        <button type="button" aria-label="适配画布" title="适配画布" onClick={fitCanvas}><Maximize2 aria-hidden="true" /><span>适配</span></button>
       </div>
       <div
         ref={canvasRef}
@@ -926,7 +925,13 @@ function App({
           zoom: canvasZoom,
         } as CSSProperties}
       >
-        <div className="podium" data-testid="podium" aria-label="讲台" style={{ left: `${(mainGridCenter / stage.width) * 100}%` }} />
+        <div className="podium" data-testid="podium" aria-label="教师区域与讲台" style={{ left: `${(mainGridCenter / stage.width) * 100}%` }}>
+          <div className="podium-teacher-zone" aria-label="教师区域">
+            <UserRound aria-hidden="true" />
+            <span>教师区域</span>
+          </div>
+          <div className="podium-surface" aria-label="讲台">讲台</div>
+        </div>
         <div className="row-labels" aria-hidden="true">{Array.from({ length: active.rows }, (_, index) => <span key={index} style={{ left: `${((stage.originX - 36) / stage.width) * 100}%`, top: `${(stage.originY + index * (regularDeskSpec.height + stage.gapY)) / stage.height * 100}%` }}>第{index + 1}排</span>)}</div>
         {draft?.desks.map((desk, index) => {
           const position = transient[desk.id] ?? desk;
@@ -992,7 +997,7 @@ function App({
                       onDrop={(event) => drop(event, seatId)}
                       onClick={() => {
                         if (student && !(view === "seating" && selectedId)) {
-                          setProfile(student);
+                          openProfile(student);
                           return;
                         }
                         if (view === "seating") seat(seatId, student);
@@ -1068,7 +1073,7 @@ function App({
                 <button
                   type="button"
                   className="profile-link"
-                  onClick={() => setProfile(student)}
+                  onClick={() => openProfile(student)}
                 >
                   档案
                 </button>
@@ -1209,7 +1214,7 @@ function App({
           <ul>
             {students.map((student) => (
               <li key={student.id}>
-                <button type="button" onClick={() => setProfile(student)}>
+                <button type="button" onClick={() => openProfile(student)}>
                   <b>{student.name}</b>
                   <span>
                     {studentGenderLabel(student.gender)} ·{" "}
@@ -1238,7 +1243,7 @@ function App({
           <ul>
             {students.map((student) => (
               <li key={student.id}>
-                <button type="button" onClick={() => setProfile(student)}>
+                <button type="button" onClick={() => openProfile(student)}>
                   <b>{student.name}</b>
                   <span>{grades.filter((grade) => grade.studentId === student.id).length} 条成绩</span>
                 </button>
@@ -1287,7 +1292,10 @@ function App({
         >
           <LayoutGrid />
         </button>
-        <div className="rail-wordmark"><b>ClassPilot</b></div>
+        <div className="rail-wordmark" aria-label="ClassPilot 班级座位助手">
+          <span className="rail-logo-mark" aria-hidden="true"><LayoutGrid /></span>
+          <b className="rail-logo-wordmark">ClassPilot</b>
+        </div>
         <button
           type="button"
           className="rail-new"
@@ -1389,15 +1397,16 @@ function App({
               type="button"
               aria-pressed={view === key}
               className={view === key ? "tab active" : "tab"}
+              title={label}
               onClick={() => activateTool(key)}
             >
               <Icon aria-hidden="true" />
-              {label}
+              <span>{label}</span>
             </button>
           ))}
-          <button type="button" className="tab" aria-label="班级设置" onClick={openSettings}>
+          <button type="button" className="tab" aria-label="班级设置" title="班级设置" onClick={openSettings}>
             <Settings aria-hidden="true" />
-            班级设置
+            <span>班级设置</span>
           </button>
         </nav>
         <section
@@ -1418,6 +1427,7 @@ function App({
         </section>
       </aside>
       <div className="status" role="status" aria-live="polite">
+        {message && <Check aria-hidden="true" />}
         {message}
       </div>
       {profile && (
