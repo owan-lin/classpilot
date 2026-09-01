@@ -9,6 +9,10 @@ export default defineConfig({
   reporter: [['list'], ['html', { open: 'never' }]],
   use: {
     baseURL: 'http://127.0.0.1:4173',
+    // PWA lifecycle is covered by the build contract.  Blocking workers here
+    // keeps fresh E2E browser contexts from being reloaded mid-interaction when
+    // a newly installed worker claims the page.
+    serviceWorkers: 'block',
     screenshot: 'only-on-failure',
     trace: 'on-first-retry',
   },

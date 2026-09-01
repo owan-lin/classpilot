@@ -32,7 +32,7 @@ describe('classroom layout contracts', () => {
     expect(first).toEqual(second)
     expect(first.slice(0, 4).every((position) => position.x >= stage.originX && position.y >= stage.originY)).toBe(true)
     expect(first[4].x).toBeLessThan(stage.originX)
-    expect(first[6].x).toBeGreaterThan(stage.originX + 2 * 190)
+    expect(first[6].x).toBeGreaterThan(stage.originX + 2 * 200)
     expect(first.slice(4).every((position) => position.y >= stage.originY)).toBe(true)
   })
 
@@ -54,7 +54,7 @@ describe('classroom layout contracts', () => {
         const assignments = desks.map((item, index) => ({ seatId: item.seatIds[0], studentId: `student-${index}` }))
         const draft = { id: 'draft', classId: 'class', podium: { x: 400, y: 0, width: 200, height: 64 }, desks, assignments, createdAt: '2026-01-01', updatedAt: '2026-01-01' }
         const alignedDraft = { ...draft, desks: repositioned }
-        const rightWing = stage.originX + desksPerRow * 190 + (desksPerRow - 1) * stage.gapX + stage.sideGap
+        const rightWing = stage.originX + desksPerRow * 200 + (desksPerRow - 1) * stage.gapX + stage.sideGap
 
         expect(first).toHaveLength(desks.length)
         expect(second).toEqual(first)
