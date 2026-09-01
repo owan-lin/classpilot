@@ -121,10 +121,12 @@ test('1440×900 concept layout keeps rails, panels, canvas, podium, and desks in
   const emptySeatBox = await emptySeat.boundingBox()
   if (!occupiedSeatBox || !emptySeatBox) throw new Error('概念图缺少可测量的已占座或空位')
   expectCloseTo(occupiedSeatBox.height, emptySeatBox.height)
-  expect(occupiedSeatBox.height).toBeGreaterThanOrEqual(70)
-  expect(occupiedSeatBox.height).toBeLessThanOrEqual(85)
-  expect(emptySeatBox.height).toBeGreaterThanOrEqual(70)
-  expect(emptySeatBox.height).toBeLessThanOrEqual(85)
+  // Seats sit inside the 150×80 minimum desk. Their own 64px visual height
+  // remains a readable/clickable target without inflating the whole desk.
+  expect(occupiedSeatBox.height).toBeGreaterThanOrEqual(40)
+  expect(occupiedSeatBox.height).toBeLessThanOrEqual(70)
+  expect(emptySeatBox.height).toBeGreaterThanOrEqual(40)
+  expect(emptySeatBox.height).toBeLessThanOrEqual(70)
 
   const workbench = page.getByTestId('classroom-workbench')
   await expect(workbench).toBeVisible()
@@ -354,6 +356,7 @@ test('2×3 grid keeps six central desks readable while seven overflow desks use 
   await expect(desks).toHaveCount(13)
   await page.getByRole('button', { name: '重排对齐' }).click()
   await expect(page.getByRole('status')).toContainText(/按网格对齐/)
+  await expect(desks).toHaveCount(13)
 
   const boxes = await Promise.all(Array.from({ length: 13 }, (_, index) => desks.nth(index).boundingBox()))
   if (boxes.some((box) => !box)) throw new Error('重排后的课桌缺少可测量视觉边界')
