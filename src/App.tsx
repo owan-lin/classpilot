@@ -794,6 +794,9 @@ function App({
           item.id === state.id ? { ...item, ...state.preview } : item,
         ),
       }));
+    // Keep the desk on top only while it is being dragged. Once released,
+    // restore normal DOM stacking so an overlapping desk can be picked next.
+    setActiveDeskId(undefined);
     drag.current = undefined;
     setTransient({});
     setMessage("课桌位置已更新并自动保存");
