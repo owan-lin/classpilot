@@ -257,6 +257,76 @@ test('desktop rails collapse independently and return space to the canvas', asyn
   await expect.poll(async () => (await canvas(page).boundingBox())?.width).toBeGreaterThan(before.width)
 })
 
+test('desktop rail states tile the workbench without blank seams, overlap, or page overflow', async ({ page }) => {
+  await page.goto('/')
+  await createClass(page, '侧栏拼接契约班')
+
+  for (const viewport of [{ width: 1280, height: 800 }, { width: 1440, height: 900 }, { width: 1920, height: 1080 }]) {
+    await page.setViewportSize(viewport)
+    const classToggle = page.getByRole('button', { name: /班级轨道/ })
+    const toolToggle = page.getByRole('button', { name: /工具轨道/ })
+    if (await classToggle.getAttribute('aria-expanded') === 'false') await classToggle.click()
+    if (await toolToggle.getAttribute('aria-expanded') === 'false') await toolToggle.click()
+
+    for (const state of [
+      { classOpen: true, toolOpen: true },
+      { classOpen: false, toolOpen: true },
+      { classOpen: true, toolOpen: false },
+      { classOpen: false, toolOpen: false },
+    ]) {
+      if ((await classToggle.getAttribute('aria-expanded')) !== String(state.classOpen)) await classToggle.click()
+      if ((await toolToggle.getAttribute('aria-expanded')) !== String(state.toolOpen)) await toolToggle.click()
+
+      await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+      const [classRailBox, canvasBox, toolRailBox] = await Promise.all([
+        rail(page, 'class').boundingBox(),
+        canvas(page).boundingBox(),
+        rail(page, 'tool').boundingBox(),
+      ])
+      if (!classRailBox || !canvasBox || !toolRailBox) throw new Error('侧栏状态缺少可测量区域')
+      expectCloseTo(classRailBox.x, 0)
+      expectCloseTo(classRailBox.x + classRailBox.width, canvasBox.x, 2)
+      expectCloseTo(canvasBox.x + canvasBox.width, toolRailBox.x, 2)
+      expectCloseTo(toolRailBox.x + toolRailBox.width, viewport.width, 2)
+      expect(canvasBox.width).toBeGreaterThanOrEqual(300)
+      expectCloseTo(canvasBox.height, viewport.height)
+    }
+  }
+})
+
+test('desktop tool icons and grade form retain usable visual proportions', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto('/')
+  await createClass(page, '控件比例契约班')
+
+  const toolNavigation = page.getByRole('navigation', { name: '班级工具' })
+  for (const label of ['排座 / 移位', '编辑教室', '录入学生', '成绩']) {
+    const control = toolNavigation.getByRole('button', { name: label })
+    const [controlBox, iconBox] = await Promise.all([control.boundingBox(), control.locator('svg').boundingBox()])
+    if (!controlBox || !iconBox) throw new Error(`${label} 缺少可测量图标或控件`)
+    expect(controlBox.height).toBeGreaterThanOrEqual(52)
+    expect(iconBox.width).toBeGreaterThanOrEqual(18)
+    expect(iconBox.width).toBeLessThanOrEqual(28)
+    expect(Math.abs(iconBox.width - iconBox.height)).toBeLessThanOrEqual(1)
+  }
+
+  await page.getByRole('button', { name: '成绩' }).click()
+  const form = toolPanel(page).locator('form.student-form--grades')
+  await expect(form).toBeVisible()
+  const score = form.getByRole('spinbutton', { name: '得分' })
+  const fullScore = form.getByRole('spinbutton', { name: '满分' })
+  const [scoreBox, fullScoreBox] = await Promise.all([score.boundingBox(), fullScore.boundingBox()])
+  if (!scoreBox || !fullScoreBox) throw new Error('成绩数值字段不可测量')
+  // Score inputs can share a row only when neither is reduced to an unusable sliver.
+  if (Math.abs(scoreBox.y - fullScoreBox.y) <= 2) {
+    expect(scoreBox.width).toBeGreaterThanOrEqual(120)
+    expect(fullScoreBox.width).toBeGreaterThanOrEqual(120)
+  }
+  expect(scoreBox.height).toBeGreaterThanOrEqual(40)
+  expect(fullScoreBox.height).toBeGreaterThanOrEqual(40)
+  await expect.poll(() => form.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true)
+})
+
 test('wide desktop workbench never page-scrolls and keeps the student tool panel usable', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto('/')

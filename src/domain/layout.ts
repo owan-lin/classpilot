@@ -21,6 +21,10 @@ export interface ClassroomStage {
   gapX: number;
   gapY: number;
   sideGap: number;
+  /** Space reserved for the row labels before the left overflow wing. */
+  rowLabelGutter: number;
+  /** Number of desk columns reserved on either side of the regular grid. */
+  sideColumnCount: number;
 }
 export interface DeskPosition {
   x: number;
@@ -51,15 +55,22 @@ export function classroomStageFor(
   const grid = 25,
     gapX = 35,
     gapY = 20,
-    sideGap = 45;
-  const sideRows = Math.max(
+    sideGap = 45,
+    rowLabelGutter = 65;
+  const overflowCount = Math.max(
     0,
     Number.isSafeInteger(configuration.sideDeskCount)
       ? (configuration.sideDeskCount ?? 0)
       : 0,
   );
-  const wing = sideRows > 0 ? regularDeskSpec.width + sideGap : 0;
-  const originX = wing + 50,
+  // Overflow desks occupy balanced left/right wings.  Each wing uses at most
+  // `rows` vertical slots before growing outward into another column.
+  const sideColumnCount =
+    overflowCount > 0 ? Math.ceil(overflowCount / (rows * 2)) : 0;
+  const wingWidth =
+    sideColumnCount * regularDeskSpec.width +
+    Math.max(0, sideColumnCount - 1) * gapX;
+  const originX = rowLabelGutter + wingWidth + (wingWidth ? sideGap : 0),
     originY = 125;
   return {
     width: Math.max(
@@ -67,15 +78,12 @@ export function classroomStageFor(
       originX +
         columns * regularDeskSpec.width +
         (columns - 1) * gapX +
-        wing +
+        (wingWidth ? sideGap + wingWidth : 0) +
         50,
     ),
     height: Math.max(
       minimumStage.height,
-      originY +
-        Math.max(rows, sideRows) * regularDeskSpec.height +
-        (Math.max(rows, sideRows) - 1) * gapY +
-        60,
+      originY + rows * regularDeskSpec.height + (rows - 1) * gapY + 60,
     ),
     grid,
     minY: 75,
@@ -84,6 +92,8 @@ export function classroomStageFor(
     gapX,
     gapY,
     sideGap,
+    rowLabelGutter,
+    sideColumnCount,
   };
 }
 
@@ -98,6 +108,8 @@ export const classroomStage: ClassroomStage = {
   gapX: 35,
   gapY: 38,
   sideGap: 45,
+  rowLabelGutter: 65,
+  sideColumnCount: 0,
 };
 
 /** Positive settings always receive an expandable canvas; there is no fixed-canvas cap. */
@@ -192,20 +204,12 @@ export function snapDeskPosition(
   };
 }
 
-function wingPositions(
-  desks: readonly DeskRecord[],
-  x: number,
-  stage: ClassroomStage,
-): DeskPosition[] {
-  return desks.map((desk, index) => ({
-    x: Math.max(0, x + Math.max(0, (regularDeskSpec.width - desk.width) / 2)),
-    y:
-      stage.originY +
-      index * (Math.max(regularDeskSpec.height, desk.height) + stage.gapY),
-  }));
-}
-
-/** Main grid has exactly rows × desksPerRow regular desks; extras and special desks use stable side wings. */
+/**
+ * Main grid has exactly rows × desksPerRow regular desks. Any remaining
+ * regular desks and every special desk are interleaved across the two side
+ * wings. Wings first fill vertically to the configured row count, then add
+ * columns outward, so an excess can never become an unbounded left column.
+ */
 export function alignedDeskPositions(
   desks: readonly DeskRecord[],
   configuration: LayoutConfiguration = { rows: 2, desksPerRow: 4 },
@@ -216,11 +220,12 @@ export function alignedDeskPositions(
   const mainCount = configuration.rows * configuration.desksPerRow,
     main = regular.slice(0, mainCount),
     extra = regular.slice(mainCount);
+  const overflow = [...extra, ...special];
   const resolvedStage =
     stage ??
     classroomStageFor({
       ...configuration,
-      sideDeskCount: Math.max(extra.length, special.length),
+      sideDeskCount: overflow.length,
     });
   const positions = new Map<string, DeskPosition>();
   main.forEach((desk, index) =>
@@ -235,17 +240,31 @@ export function alignedDeskPositions(
           (regularDeskSpec.height + resolvedStage.gapY),
     }),
   );
-  wingPositions(extra, 25, resolvedStage).forEach((position, index) =>
-    positions.set(extra[index].id, position),
-  );
-  const rightX =
+  const mainRight =
     resolvedStage.originX +
     configuration.desksPerRow * regularDeskSpec.width +
-    (configuration.desksPerRow - 1) * resolvedStage.gapX +
-    resolvedStage.sideGap;
-  wingPositions(special, rightX, resolvedStage).forEach((position, index) =>
-    positions.set(special[index].id, position),
-  );
+    (configuration.desksPerRow - 1) * resolvedStage.gapX;
+  overflow.forEach((desk, index) => {
+    const left = index % 2 === 0;
+    const sideSlot = Math.floor(index / 2);
+    const column = Math.floor(sideSlot / configuration.rows);
+    const row = sideSlot % configuration.rows;
+    const wingX = left
+      ? resolvedStage.originX -
+        resolvedStage.sideGap -
+        (column + 1) * regularDeskSpec.width -
+        column * resolvedStage.gapX
+      : mainRight +
+        resolvedStage.sideGap +
+        column * (regularDeskSpec.width + resolvedStage.gapX);
+    positions.set(desk.id, {
+      x: wingX + Math.max(0, (regularDeskSpec.width - desk.width) / 2),
+      y:
+        resolvedStage.originY +
+        row * (regularDeskSpec.height + resolvedStage.gapY) +
+        Math.max(0, (regularDeskSpec.height - desk.height) / 2),
+    });
+  });
   return desks.map(
     (desk) => positions.get(desk.id) ?? { x: desk.x, y: desk.y },
   );
