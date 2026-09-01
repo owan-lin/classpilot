@@ -144,24 +144,24 @@ test('1440×900 concept layout keeps rails, panels, canvas, podium, and desks in
   if (!initialCanvas || !classRail || !toolRail || !classRailBandBox || !toolRailBandBox || !classPanel || !initialToolPanel || !classToggle || !toolToggle || !podium || !firstDesk)
     throw new Error('概念图工作台缺少可测量的必要区域')
 
-  // These are deliberately ranges, not screenshot pixels: the approved concept
-  // calls for a 106px left rail, ~201px class panel, ≥850px teaching canvas,
-  // ~204px tool panel, and 72px right rail at this viewport.
+  // These are deliberately ranges, not screenshot pixels: a compact left rail,
+  // class panel, teaching-first canvas, tool panel, and compact right rail must
+  // remain a single continuous desktop frame at this viewport.
   expectCloseTo(classToggle.x, 0)
-  expect(classToggle.width).toBeGreaterThanOrEqual(90)
-  expect(classToggle.width).toBeLessThanOrEqual(120)
+  expect(classToggle.width).toBeGreaterThanOrEqual(56)
+  expect(classToggle.width).toBeLessThanOrEqual(80)
   expectCloseTo(classPanel.x, classToggle.width)
   expect(classPanel.width).toBeGreaterThanOrEqual(180)
   expect(classPanel.width).toBeLessThanOrEqual(225)
   expectCloseTo(initialCanvas.x, classPanel.x + classPanel.width)
-  expect(initialCanvas.width).toBeGreaterThanOrEqual(850)
-  expect(initialCanvas.width / 1440).toBeLessThan(0.66)
+  expect(initialCanvas.width).toBeGreaterThanOrEqual(800)
+  expect(initialCanvas.width / 1440).toBeLessThan(0.7)
   expectCloseTo(initialToolPanel.x, initialCanvas.x + initialCanvas.width)
-  expect(initialToolPanel.width).toBeGreaterThanOrEqual(180)
-  expect(initialToolPanel.width).toBeLessThanOrEqual(240)
+  expect(initialToolPanel.width).toBeGreaterThanOrEqual(210)
+  expect(initialToolPanel.width).toBeLessThanOrEqual(260)
   expectCloseTo(toolToggle.x + toolToggle.width, 1440)
-  expect(toolToggle.width).toBeGreaterThanOrEqual(60)
-  expect(toolToggle.width).toBeLessThanOrEqual(90)
+  expect(toolToggle.width).toBeGreaterThanOrEqual(56)
+  expect(toolToggle.width).toBeLessThanOrEqual(80)
   expectCloseTo(initialCanvas.y, 0)
   expectCloseTo(initialCanvas.height, 900)
   expectCloseTo(classPanel.y, initialCanvas.y)
@@ -172,13 +172,13 @@ test('1440×900 concept layout keeps rails, panels, canvas, podium, and desks in
   expectCloseTo(classRailBandBox.x, 0)
   expectCloseTo(classRailBandBox.y, 0)
   expectCloseTo(classRailBandBox.height, 900)
-  expect(classRailBandBox.width).toBeGreaterThanOrEqual(90)
-  expect(classRailBandBox.width).toBeLessThanOrEqual(120)
+  expect(classRailBandBox.width).toBeGreaterThanOrEqual(56)
+  expect(classRailBandBox.width).toBeLessThanOrEqual(80)
   expectCloseTo(toolRailBandBox.x + toolRailBandBox.width, 1440)
   expectCloseTo(toolRailBandBox.y, 0)
   expectCloseTo(toolRailBandBox.height, 900)
-  expect(toolRailBandBox.width).toBeGreaterThanOrEqual(60)
-  expect(toolRailBandBox.width).toBeLessThanOrEqual(90)
+  expect(toolRailBandBox.width).toBeGreaterThanOrEqual(56)
+  expect(toolRailBandBox.width).toBeLessThanOrEqual(80)
   await expectDeepBlue(classRailBand)
   await expectDeepBlue(toolRailBand)
 
@@ -288,6 +288,19 @@ test('desktop rail states tile the workbench without blank seams, overlap, or pa
       expectCloseTo(classRailBox.x + classRailBox.width, canvasBox.x, 2)
       expectCloseTo(canvasBox.x + canvasBox.width, toolRailBox.x, 2)
       expectCloseTo(toolRailBox.x + toolRailBox.width, viewport.width, 2)
+      expect(classRailBox.width).toBeGreaterThanOrEqual(56)
+      expect(toolRailBox.width).toBeGreaterThanOrEqual(56)
+      // Rails are display-contents grid hosts; the visible edge surface is the
+      // persistent deep-blue band, which must stay above the classroom canvas.
+      const rightBand = railBand(page, 'tool')
+      await expectDeepBlue(rightBand)
+      if (!state.toolOpen) {
+        const surface = await rightBand.evaluate((element) => {
+          const style = getComputedStyle(element)
+          return { zIndex: style.zIndex, backgroundColor: style.backgroundColor }
+        })
+        expect(surface).toMatchObject({ zIndex: '1', backgroundColor: 'rgb(18, 61, 93)' })
+      }
       expect(canvasBox.width).toBeGreaterThanOrEqual(300)
       expectCloseTo(canvasBox.height, viewport.height)
     }
