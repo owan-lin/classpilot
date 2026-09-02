@@ -4,7 +4,6 @@ type Page = import('@playwright/test').Page
 type Gender = 'male' | 'female' | 'unspecified'
 
 const rail = (page: Page, side: 'class' | 'tool') => page.getByTestId(`${side}-rail`)
-const railBand = (page: Page, side: 'class' | 'tool') => page.getByTestId(`${side}-rail-band`)
 const canvas = (page: Page) => page.getByTestId('classroom-canvas')
 const toolPanel = (page: Page) => page.getByTestId('tool-panel')
 
@@ -21,8 +20,8 @@ function expectSameBox(actual: Box, expected: Box, tolerance = 2) {
   expectCloseTo(actual.height, expected.height, tolerance)
 }
 
-async function expectDeepBlue(locator: ReturnType<Page['getByTestId']>) {
-  const color = await locator.evaluate((element) => getComputedStyle(element).backgroundColor)
+async function expectDeepBlue(locator: ReturnType<Page['getByTestId']>, pseudo?: string) {
+  const color = await locator.evaluate((element, targetPseudo) => getComputedStyle(element, targetPseudo).backgroundColor, pseudo)
   const channels = color.match(/\d+/g)?.map(Number)
   expect(channels, `深蓝轨道应使用不透明颜色，收到 ${color}`).toHaveLength(3)
   if (!channels) throw new Error('无法解析轨道背景色')
@@ -265,8 +264,8 @@ test('desktop rail states tile the workbench without blank seams, overlap, or pa
 
   for (const viewport of [{ width: 1280, height: 800 }, { width: 1440, height: 900 }, { width: 1920, height: 1080 }]) {
     await page.setViewportSize(viewport)
-    const classToggle = page.getByRole('button', { name: /班级轨道/ })
-    const toolToggle = page.getByRole('button', { name: /工具轨道/ })
+    const classToggle = page.locator('button.rail-toggle[aria-controls="class-rail"]')
+    const toolToggle = page.locator('button.rail-toggle[aria-controls="tool-rail"]')
     if (await classToggle.getAttribute('aria-expanded') === 'false') await classToggle.click()
     if (await toolToggle.getAttribute('aria-expanded') === 'false') await toolToggle.click()
 
@@ -292,16 +291,17 @@ test('desktop rail states tile the workbench without blank seams, overlap, or pa
       expectCloseTo(toolRailBox.x + toolRailBox.width, viewport.width, 2)
       expect(classRailBox.width).toBeGreaterThanOrEqual(56)
       expect(toolRailBox.width).toBeGreaterThanOrEqual(56)
-      // Rails are display-contents grid hosts; the visible edge surface is the
-      // persistent deep-blue band, which must stay above the classroom canvas.
-      const rightBand = railBand(page, 'tool')
-      await expectDeepBlue(rightBand)
+      // The decorative test-id band is now transparent. The rail host's
+      // visible ::before surface is the persistent deep-blue user-facing band.
+      const rightSurface = rail(page, 'tool')
+      await expectDeepBlue(rightSurface, '::before')
       if (!state.toolOpen) {
-        const surface = await rightBand.evaluate((element) => {
-          const style = getComputedStyle(element)
-          return { zIndex: style.zIndex, backgroundColor: style.backgroundColor }
+        const surface = await rightSurface.evaluate((element) => {
+          const box = element.getBoundingClientRect()
+          const topmost = document.elementFromPoint(box.right - 12, box.top + box.height / 2)
+          return topmost === element || element.contains(topmost)
         })
-        expect(surface).toMatchObject({ zIndex: '1', backgroundColor: 'rgb(18, 61, 93)' })
+        expect(surface, '折叠后的深蓝轨道必须覆盖在画布之上').toBe(true)
       }
       expect(canvasBox.width).toBeGreaterThanOrEqual(300)
       expectCloseTo(canvasBox.height, viewport.height)
