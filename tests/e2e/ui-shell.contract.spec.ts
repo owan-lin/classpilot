@@ -133,13 +133,19 @@ test('1440×900 concept layout keeps rails, panels, canvas, podium, and desks in
   const initialCanvas = await canvas(page).boundingBox()
   const classRail = await rail(page, 'class').boundingBox()
   const toolRail = await rail(page, 'tool').boundingBox()
+  const toolNavigation = page.getByRole('navigation', { name: '班级工具' })
+  // Navigation is the real interactive right rail band. The legacy decorative
+  // data-testid band no longer owns the icon controls in the three-column UI.
+  const toolRailBandBox = await toolNavigation.boundingBox()
   const classPanel = await page.getByTestId('class-panel').boundingBox()
   const initialToolPanel = await toolPanel(page).boundingBox()
   const classToggle = await page.getByRole('button', { name: '折叠班级轨道' }).boundingBox()
   const toolToggle = await page.getByRole('button', { name: '折叠工具轨道' }).boundingBox()
   const podium = await page.getByTestId('podium').boundingBox()
   const firstDesk = await canvas(page).getByRole('article').first().boundingBox()
-  if (!initialCanvas || !classRail || !toolRail || !classPanel || !initialToolPanel || !classToggle || !toolToggle || !podium || !firstDesk)
+  const mainDeskLocator = canvas(page).getByRole('article')
+  const mainDeskBoxes = await Promise.all(Array.from({ length: 6 }, (_, index) => mainDeskLocator.nth(index).boundingBox()))
+  if (!initialCanvas || !classRail || !toolRail || !toolRailBandBox || !classPanel || !initialToolPanel || !classToggle || !toolToggle || !podium || !firstDesk || mainDeskBoxes.some((box) => !box))
     throw new Error('概念图工作台缺少可测量的必要区域')
 
   // These are deliberately ranges, not screenshot pixels: a compact left rail,
@@ -173,11 +179,15 @@ test('1440×900 concept layout keeps rails, panels, canvas, podium, and desks in
   expectCloseTo(initialToolPanel.height, initialCanvas.height)
   expectCloseTo(classRail.height, initialCanvas.height)
   expectCloseTo(toolRail.height, initialCanvas.height)
-  // The podium stays centered in the teaching area and is visibly smaller than a
-  // row of desks; desks retain a card-like teaching-table scale below it.
-  // A visible vertical scrollbar can shift the geometric center by half its
-  // width; the podium should still read as centered to within that gutter.
-  expectCloseTo(podium.x + podium.width / 2, initialCanvas.x + initialCanvas.width / 2, 10)
+  // Classroom settings define the teaching axis: the podium must center over
+  // the configured main desk grid, not merely over the currently visible
+  // scroller viewport (which can include overflow wings).
+  const mainGrid = mainDeskBoxes as Box[]
+  const mainGridCenterX = (
+    Math.min(...mainGrid.map((deskBox) => deskBox.x)) +
+    Math.max(...mainGrid.map((deskBox) => deskBox.x + deskBox.width))
+  ) / 2
+  expectCloseTo(podium.x + podium.width / 2, mainGridCenterX, 10)
   expect(podium.width / initialCanvas.width).toBeGreaterThan(0.18)
   expect(podium.width / initialCanvas.width).toBeLessThan(0.36)
   expect(podium.height).toBeGreaterThanOrEqual(48)
@@ -200,7 +210,6 @@ test('1440×900 concept layout keeps rails, panels, canvas, podium, and desks in
   expect(firstSeat.height).toBeLessThanOrEqual(85)
   await expect(canvas(page).getByRole('article').first()).toHaveCSS('transform', 'none')
 
-  const toolNavigation = page.getByRole('navigation', { name: '班级工具' })
   for (const tool of ['排座 / 移位', '编辑教室', '录入学生', '成绩']) {
     const control = toolNavigation.getByRole('button', { name: tool })
     await expect(control).toBeVisible()
