@@ -101,8 +101,8 @@ test('rail states at desktop, tablet, and phone avoid mutual overlap and page ov
   for (const viewport of [{ width: 1440, height: 900 }, { width: 1024, height: 768 }, { width: 375, height: 812 }]) {
     await page.setViewportSize(viewport)
     await expect.poll(() => noHorizontalPageOverflow(page)).toBe(true)
-    const classToggle = page.getByRole('button', { name: /班级轨道/ })
-    const toolToggle = page.getByRole('button', { name: /工具轨道/ })
+    const classToggle = page.locator('button.rail-toggle[aria-controls="class-rail"]')
+    const toolToggle = page.locator('button.rail-toggle[aria-controls="tool-rail"]')
     if (viewport.width > 1024) {
       if (await classToggle.getAttribute('aria-expanded') === 'true') await classToggle.click()
       if (await toolToggle.getAttribute('aria-expanded') === 'true') await toolToggle.click()

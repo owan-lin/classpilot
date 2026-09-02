@@ -133,17 +133,13 @@ test('1440×900 concept layout keeps rails, panels, canvas, podium, and desks in
   const initialCanvas = await canvas(page).boundingBox()
   const classRail = await rail(page, 'class').boundingBox()
   const toolRail = await rail(page, 'tool').boundingBox()
-  const classRailBand = railBand(page, 'class')
-  const toolRailBand = railBand(page, 'tool')
-  const classRailBandBox = await classRailBand.boundingBox()
-  const toolRailBandBox = await toolRailBand.boundingBox()
   const classPanel = await page.getByTestId('class-panel').boundingBox()
   const initialToolPanel = await toolPanel(page).boundingBox()
   const classToggle = await page.getByRole('button', { name: '折叠班级轨道' }).boundingBox()
   const toolToggle = await page.getByRole('button', { name: '折叠工具轨道' }).boundingBox()
   const podium = await page.getByTestId('podium').boundingBox()
   const firstDesk = await canvas(page).getByRole('article').first().boundingBox()
-  if (!initialCanvas || !classRail || !toolRail || !classRailBandBox || !toolRailBandBox || !classPanel || !initialToolPanel || !classToggle || !toolToggle || !podium || !firstDesk)
+  if (!initialCanvas || !classRail || !toolRail || !classPanel || !initialToolPanel || !classToggle || !toolToggle || !podium || !firstDesk)
     throw new Error('概念图工作台缺少可测量的必要区域')
 
   // These are deliberately ranges, not screenshot pixels: a compact left rail,
@@ -159,8 +155,13 @@ test('1440×900 concept layout keeps rails, panels, canvas, podium, and desks in
   expect(initialCanvas.width).toBeGreaterThanOrEqual(800)
   expect(initialCanvas.width / 1440).toBeLessThan(0.7)
   expectCloseTo(initialToolPanel.x, initialCanvas.x + initialCanvas.width)
-  expect(initialToolPanel.width).toBeGreaterThanOrEqual(210)
-  expect(initialToolPanel.width).toBeLessThanOrEqual(260)
+  // The redesigned right aside is 352px: a ~280px inspector content surface
+  // plus a 72px rail.  Keep these separate so a wide aside cannot hide a
+  // narrow, unusable form panel.
+  expect(initialToolPanel.width).toBeGreaterThanOrEqual(270)
+  expect(initialToolPanel.width).toBeLessThanOrEqual(290)
+  expect(toolRail.width).toBeGreaterThanOrEqual(320)
+  expect(toolRail.width).toBeLessThanOrEqual(360)
   expectCloseTo(toolToggle.x + toolToggle.width, 1440)
   expect(toolToggle.width).toBeGreaterThanOrEqual(56)
   expect(toolToggle.width).toBeLessThanOrEqual(80)
@@ -169,21 +170,9 @@ test('1440×900 concept layout keeps rails, panels, canvas, podium, and desks in
   expectCloseTo(classPanel.y, initialCanvas.y)
   expectCloseTo(classPanel.height, initialCanvas.height)
   expectCloseTo(initialToolPanel.y, initialCanvas.y)
+  expectCloseTo(initialToolPanel.height, initialCanvas.height)
   expectCloseTo(classRail.height, initialCanvas.height)
   expectCloseTo(toolRail.height, initialCanvas.height)
-  expectCloseTo(classRailBandBox.x, 0)
-  expectCloseTo(classRailBandBox.y, 0)
-  expectCloseTo(classRailBandBox.height, 900)
-  expect(classRailBandBox.width).toBeGreaterThanOrEqual(56)
-  expect(classRailBandBox.width).toBeLessThanOrEqual(80)
-  expectCloseTo(toolRailBandBox.x + toolRailBandBox.width, 1440)
-  expectCloseTo(toolRailBandBox.y, 0)
-  expectCloseTo(toolRailBandBox.height, 900)
-  expect(toolRailBandBox.width).toBeGreaterThanOrEqual(56)
-  expect(toolRailBandBox.width).toBeLessThanOrEqual(80)
-  await expectDeepBlue(classRailBand)
-  await expectDeepBlue(toolRailBand)
-
   // The podium stays centered in the teaching area and is visibly smaller than a
   // row of desks; desks retain a card-like teaching-table scale below it.
   // A visible vertical scrollbar can shift the geometric center by half its
