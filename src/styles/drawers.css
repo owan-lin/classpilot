@@ -18,6 +18,26 @@
     transition-delay: 0s;
   }
 
+  /* Keep the two edge controls above the scrim so either drawer can be
+     switched directly while the other one is open. */
+  .class-rail > .rail-toggle,
+  .tool-rail > .rail-toggle,
+  .rail-new { z-index: 27; }
+
+  /* The hosts must share the overlay layer too: a fixed child cannot escape a
+     lower stacking context (or the base rail's clipping) by z-index alone.
+     Keep the transparent hosts click-through so only their controls/panels
+     sit above the scrim. */
+  .class-rail,
+  .tool-rail {
+    z-index: 24;
+    overflow: visible;
+    pointer-events: none;
+  }
+
+  .class-rail > *,
+  .tool-rail > * { pointer-events: auto; }
+
   .rail-panel,
   .tool-panel {
     z-index: 25;
