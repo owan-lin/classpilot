@@ -315,6 +315,7 @@ test('desktop tool icons and grade form retain usable visual proportions', async
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto('/')
   await createClass(page, '控件比例契约班')
+  await addStudent(page, { name: '比例学生', studentNo: 'FORM-01', gender: 'unspecified' })
 
   const toolNavigation = page.getByRole('navigation', { name: '班级工具' })
   for (const label of ['排座 / 移位', '编辑教室', '录入学生', '成绩']) {
@@ -328,10 +329,14 @@ test('desktop tool icons and grade form retain usable visual proportions', async
   }
 
   await page.getByRole('button', { name: '成绩' }).click()
-  const form = toolPanel(page).locator('form.student-form--grades')
+  const gradeEntry = toolPanel(page).getByRole('button', { name: /比例学生.*0 条成绩/ })
+  await gradeEntry.click()
+  const profile = page.getByRole('dialog', { name: '比例学生' })
+  await profile.getByRole('tab', { name: '成绩' }).click()
+  const form = profile.getByRole('tabpanel', { name: '比例学生 的成绩' }).locator('form')
   await expect(form).toBeVisible()
-  const score = form.getByRole('spinbutton', { name: '得分' })
-  const fullScore = form.getByRole('spinbutton', { name: '满分' })
+  const score = form.getByRole('spinbutton', { name: '档案成绩得分' })
+  const fullScore = form.getByRole('spinbutton', { name: '档案成绩满分' })
   const [scoreBox, fullScoreBox] = await Promise.all([score.boundingBox(), fullScore.boundingBox()])
   if (!scoreBox || !fullScoreBox) throw new Error('成绩数值字段不可测量')
   // Score inputs can share a row only when neither is reduced to an unusable sliver.
