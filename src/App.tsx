@@ -935,7 +935,17 @@ function App({
           zoom: canvasZoom,
         } as CSSProperties}
       >
-        <div className="podium" data-testid="podium" aria-label="教师区域与讲台" style={{ left: `${(mainGridCenter / stage.width) * 100}%` }}>
+        <div
+          className="podium"
+          data-testid="podium"
+          aria-label="教师区域与讲台"
+          style={{
+            position: "absolute",
+            top: 12,
+            left: `${(mainGridCenter / stage.width) * 100}%`,
+            transform: "translateX(-50%)",
+          }}
+        >
           <div className="podium-teacher-zone" aria-label="教师区域">
             <UserRound aria-hidden="true" />
             <span>教师区域</span>
