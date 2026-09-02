@@ -1,0 +1,49 @@
+@media (max-width: 1024px) {
+  .drawer-backdrop {
+    position: fixed;
+    z-index: 23;
+    inset: 0;
+    display: block;
+    visibility: hidden;
+    pointer-events: none;
+    background: rgb(12 37 55 / 42%);
+    opacity: 0;
+    transition: opacity var(--motion), visibility 0s linear var(--motion);
+  }
+
+  .drawer-backdrop.visible {
+    visibility: visible;
+    pointer-events: auto;
+    opacity: 1;
+    transition-delay: 0s;
+  }
+
+  .rail-panel,
+  .tool-panel {
+    z-index: 25;
+    box-sizing: border-box;
+    max-width: 88vw;
+  }
+
+  .class-rail > .rail-close,
+  .tool-rail:not(.open) .rail-close { display: none; }
+
+  .class-rail.open > .rail-close { display: grid; }
+  .class-rail.open > .rail-toggle,
+  .class-rail.open > .rail-new,
+  .tool-rail.open > .rail-toggle { visibility: hidden; pointer-events: none; }
+
+  .tool-rail.open > nav {
+    position: fixed;
+    z-index: 26;
+    top: 72px;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    width: 64px;
+    padding: 8px 6px;
+    background: var(--nav);
+  }
+
+  .tool-rail.open > .tool-panel { padding-right: 88px; }
+}
