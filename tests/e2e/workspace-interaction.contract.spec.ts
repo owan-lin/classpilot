@@ -20,6 +20,23 @@ function noHorizontalPageOverflow(page: Page) {
   return page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
 }
 
+test('dragging blank canvas or toolbar space never moves the first desk', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto('/')
+  await createClass(page, '空白拖拽守恒班')
+  await page.getByRole('button', { name: '编辑教室' }).click()
+  await page.getByRole('button', { name: '自由移动' }).click()
+  const desks = page.getByTestId('classroom-canvas').getByRole('article')
+  const before = await desks.evaluateAll((items) => items.map((item) => item.getAttribute('style')))
+  const canvas = await page.getByTestId('classroom-canvas').boundingBox()
+  if (!canvas) throw new Error('缺少画布')
+  await page.mouse.move(canvas.x + 30, canvas.y + canvas.height - 100)
+  await page.mouse.down()
+  await page.mouse.move(canvas.x + 100, canvas.y + canvas.height - 160, { steps: 5 })
+  await page.mouse.up()
+  expect(await desks.evaluateAll((items) => items.map((item) => item.getAttribute('style')))).toEqual(before)
+})
+
 test('canvas zoom is independent from the desktop shell and desks remain operable after zooming', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto('/')

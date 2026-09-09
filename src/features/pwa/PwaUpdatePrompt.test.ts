@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { shouldReloadForControllerChange } from './PwaUpdatePrompt'
+import { shouldReloadForControllerChange } from './controllerChange'
 
 describe('PwaUpdatePrompt controller changes', () => {
   it('does not reload when a page receives its first service-worker controller', () => {

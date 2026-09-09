@@ -1,1 +1,130 @@
-:root{color-scheme:light;--ink:#17324d;--muted:#60778a;--nav:#143f60;--nav-hover:#1d628e;--brand:#1972aa;--brand-soft:#e6f2f8;--canvas:#f4f7f7;--surface:#fff;--line:#d8e2e7;--line-strong:#b9cbd5;--danger:#bd3a34;--desk:#f8fafb;--desk-line:#9fc1d2;--male:#dceef8;--female:#f8e3eb;--unspecified:#e8ecef;--shadow:0 4px 14px rgb(23 50 77 / 9%);--motion:180ms cubic-bezier(.2,.8,.2,1);font-family:Inter,"Segoe UI","Microsoft YaHei","PingFang SC",sans-serif}*{box-sizing:border-box}html,body,#root{min-width:0;min-height:100%;margin:0}body{color:var(--ink);background:var(--canvas);font:14px/1.5 var(--font-sans,inherit)}button,input,select,textarea{font:inherit}button{cursor:pointer}button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid rgb(25 114 170 / 35%);outline-offset:2px}
+:root {
+  color-scheme: light;
+
+  /* Typography */
+  --font-sans: Inter, "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+
+  /* Semantic color tokens */
+  --ink: #17324d;
+  --ink-strong: #28536b;
+  --ink-soft: #625f58;
+  --ink-action: #1b597e;
+  --ink-row-label: #506777;
+  --ink-teacher: #527185;
+  --muted: #60778a;
+  --nav: #143f60;
+  --nav-hover: #1d628e;
+  --nav-foreground: #e9f5fb;
+  --nav-foreground-muted: #dcecf5;
+  --nav-active: #bdeaff;
+  --brand: #1972aa;
+  --brand-soft: #e6f2f8;
+  --canvas: #f4f7f7;
+  --canvas-grid: #dfe9e7;
+  --surface: #fff;
+  --surface-subtle: #f8fbfc;
+  --surface-muted: #f7fafb;
+  --surface-soft: #f5f8f9;
+  --surface-segment: #e7f0f4;
+  --surface-tab: #f0f5f7;
+  --surface-special: #eef5f8;
+  --surface-special-header: #eef6f9;
+  --surface-special-body: #f8fbfc;
+  --surface-title: rgb(255 255 255 / 94%);
+  --desk: #f8fafb;
+  --line: #d8e2e7;
+  --line-strong: #b9cbd5;
+  --line-card: #e0e8ec;
+  --line-control: #bcd1dc;
+  --line-desk: #9fc1d2;
+  --desk-line: var(--line-desk);
+  --line-desk-seat: #d7e4ea;
+  --line-special: #74a6bf;
+  --line-special-header: #c6dce6;
+  --line-special-body: #c9dee8;
+  --line-active: #79b4d5;
+  --line-podium: #91b9cd;
+  --danger: #bd3a34;
+  --male: #dceef8;
+  --female: #f8e3eb;
+  --unspecified: #e8ecef;
+  --scrim: rgb(12 37 55 / 42%);
+  --nav-border: rgb(233 245 251 / 34%);
+  --nav-hover-overlay: rgb(255 255 255 / 12%);
+  --nav-surface-overlay: rgb(255 255 255 / 8%);
+  --selection: #cde7f7;
+
+  /* Shape, elevation and motion */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-pill: 99px;
+  --shadow: 0 4px 14px rgb(23 50 77 / 9%);
+  --shadow-tab: 0 1px 2px rgb(23 50 77 / 10%);
+  --shadow-focus: 0 0 0 3px rgb(25 114 170 / 35%);
+  --motion: 180ms cubic-bezier(.2, .8, .2, 1);
+
+  /* Workbench geometry */
+  --class-open: 272px;
+  --tool-open: 352px;
+  --class-rail: 64px;
+  --tool-rail: 72px;
+  --drawer-width: min(360px, 88vw);
+  --mobile-gutter: 16px;
+
+  /* Layer contract: canvas < drawer host < panel/nav < controls < modal. */
+  --z-canvas: 1;
+  --z-status: 20;
+  --z-mobile-toggle: 22;
+  --z-drawer-backdrop: 23;
+  --z-drawer-host: 24;
+  --z-drawer-panel: 25;
+  --z-drawer-close: 26;
+  --z-drawer-toggle: 27;
+  --z-overlay: 30;
+  --z-tooltip: 40;
+
+  /* Backward-compatible aliases used by the global entry stylesheet. */
+  --color-ink-strong: var(--ink);
+  --color-brand-500: var(--brand);
+
+  font-family: var(--font-sans);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-width: 0;
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  color: var(--ink);
+  background: var(--canvas);
+  font: 14px/1.5 var(--font-sans);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid rgb(25 114 170 / 35%);
+  outline-offset: 2px;
+  box-shadow: var(--shadow-focus);
+}

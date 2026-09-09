@@ -7,7 +7,7 @@ const rail = (page: Page, side: 'class' | 'tool') => page.getByTestId(`${side}-r
 const canvas = (page: Page) => page.getByTestId('classroom-canvas')
 const toolPanel = (page: Page) => page.getByTestId('tool-panel')
 
-type Box = NonNullable<Awaited<ReturnType<Page['locator']>['boundingBox']>>
+type Box = NonNullable<Awaited<ReturnType<import('@playwright/test').Locator['boundingBox']>>>
 
 function expectCloseTo(actual: number, expected: number, tolerance = 2) {
   expect(Math.abs(actual - expected)).toBeLessThanOrEqual(tolerance)
@@ -120,12 +120,14 @@ test('1440×900 concept layout keeps rails, panels, canvas, podium, and desks in
   const emptySeatBox = await emptySeat.boundingBox()
   if (!occupiedSeatBox || !emptySeatBox) throw new Error('概念图缺少可测量的已占座或空位')
   expectCloseTo(occupiedSeatBox.height, emptySeatBox.height)
-  // Seats sit inside the 150×80 minimum desk. Their own 64px visual height
-  // remains a readable/clickable target without inflating the whole desk.
+  // With decorative desk headings removed, seats use the entire desk surface.
+  // Verify equal hit areas bounded by their actual desk, not the old header gap.
+  const deskSurface = await occupiedSeat.locator('xpath=ancestor::article').boundingBox()
+  if (!deskSurface) throw new Error('缺少课桌尺寸')
   expect(occupiedSeatBox.height).toBeGreaterThanOrEqual(40)
-  expect(occupiedSeatBox.height).toBeLessThanOrEqual(70)
+  expect(occupiedSeatBox.height).toBeLessThanOrEqual(deskSurface.height)
   expect(emptySeatBox.height).toBeGreaterThanOrEqual(40)
-  expect(emptySeatBox.height).toBeLessThanOrEqual(70)
+  expect(emptySeatBox.height).toBeLessThanOrEqual(deskSurface.height)
 
   const workbench = page.getByTestId('classroom-workbench')
   await expect(workbench).toBeVisible()
@@ -196,23 +198,23 @@ test('1440×900 concept layout keeps rails, panels, canvas, podium, and desks in
   expect(firstDesk.height).toBeGreaterThanOrEqual(80)
   expect(firstDesk.height).toBeLessThanOrEqual(125)
   expect(firstDesk.y).toBeGreaterThan(podium.y + podium.height)
-  const deskHeader = await canvas(page).getByRole('article').first().locator('header').boundingBox()
-  if (!deskHeader) throw new Error('概念图课桌缺少可测量木质顶沿')
-  expect(deskHeader.height).toBeGreaterThanOrEqual(24)
-  expect(deskHeader.height).toBeLessThanOrEqual(30)
+  // The flat seating view deliberately removes the decorative numbered header.
+  await expect(canvas(page).getByRole('article').first().locator('header')).toBeHidden()
   await expect(canvas(page).getByTestId('seat').first()).toBeVisible()
   const firstSeat = await canvas(page).getByTestId('seat').first().boundingBox()
   if (!firstSeat) throw new Error('概念图课桌缺少可测量座位')
   expect(firstSeat.width).toBeGreaterThanOrEqual(60)
   expect(firstSeat.width).toBeLessThanOrEqual(95)
   expect(firstSeat.height).toBeGreaterThanOrEqual(48)
-  expect(firstSeat.height).toBeLessThanOrEqual(85)
+  expect(firstSeat.height).toBeLessThan(firstDesk.height)
   await expect(canvas(page).getByRole('article').first()).toHaveCSS('transform', 'none')
 
   for (const tool of ['排座 / 移位', '编辑教室', '录入学生', '成绩']) {
     const control = toolNavigation.getByRole('button', { name: tool })
     await expect(control).toBeVisible()
-    await expect(control).toContainText(tool)
+    const shortLabels: Record<string, string> = { '排座 / 移位': '排座', '编辑教室': '教室', '录入学生': '学生', '成绩': '成绩' }
+    await expect(control).toContainText(shortLabels[tool])
+    await expect(control).toHaveAccessibleName(tool)
     await expect(control.locator('svg')).toHaveCount(1)
     const controlBox = await control.boundingBox()
     if (!controlBox) throw new Error(`右侧工具 ${tool} 不可测量`)

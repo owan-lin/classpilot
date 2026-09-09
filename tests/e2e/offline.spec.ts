@@ -1,0 +1,42 @@
+import { expect, test } from '@playwright/test'
+
+// This suite deliberately enables the real production service worker. The
+// interaction suite blocks it so an older cache cannot hide a broken build.
+test.use({ serviceWorkers: 'allow' })
+
+test('installed web shell reloads offline and retains student, seating and grade edits', async ({ page, context }) => {
+  const errors: string[] = []
+  page.on('pageerror', (error) => errors.push(error.message))
+  await page.goto(process.env.GITHUB_ACTIONS ? '/classpilot/' : '/')
+  await page.evaluate(async () => { await navigator.serviceWorker.ready })
+  await expect.poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller))).toBe(true)
+  await page.getByRole('button', { name: '新建班级' }).first().click()
+  await page.getByRole('textbox', { name: '班级名称' }).fill('离线验收虚构班')
+  await page.getByRole('button', { name: '创建班级并开始' }).click()
+  await expect(page.getByTestId('classroom-canvas')).toBeVisible()
+  await context.setOffline(true)
+  await page.getByRole('button', { name: '录入学生' }).click()
+  await page.getByRole('textbox', { name: '姓名' }).fill('离线虚构学生')
+  await page.getByRole('button', { name: '保存并继续' }).click()
+  await page.getByRole('button', { name: '排座 / 移位' }).click()
+  await page.locator('.pool-student').filter({ hasText: '离线虚构学生' }).click()
+  await page.getByTestId('seat').filter({ hasText: '空位' }).first().click()
+  await page.getByTestId('seat').filter({ hasText: '离线虚构学生' }).click()
+  const dialog = page.getByRole('dialog', { name: '离线虚构学生' })
+  await dialog.getByRole('tab', { name: '成绩' }).click()
+  await dialog.getByRole('textbox', { name: '档案成绩学科' }).fill('数学')
+  await dialog.getByRole('textbox', { name: '档案成绩考试' }).fill('离线测验')
+  await dialog.getByLabel('档案成绩日期').fill('2026-09-08')
+  await dialog.getByRole('spinbutton', { name: '档案成绩得分' }).fill('86')
+  await dialog.getByRole('spinbutton', { name: '档案成绩满分' }).fill('100')
+  await dialog.getByRole('button', { name: '保存成绩' }).click()
+  await expect(dialog).toContainText('数学 · 离线测验 · 86/100')
+  await page.reload()
+  const restored = page.getByTestId('seat').filter({ hasText: '离线虚构学生' })
+  await expect(restored).toBeVisible()
+  await restored.click()
+  const reopened = page.getByRole('dialog', { name: '离线虚构学生' })
+  await reopened.getByRole('tab', { name: '成绩' }).click()
+  await expect(reopened).toContainText('数学 · 离线测验 · 86/100')
+  expect(errors).toEqual([])
+})

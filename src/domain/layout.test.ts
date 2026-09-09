@@ -100,4 +100,22 @@ describe('classroom layout contracts', () => {
     expect(rebuilt.desks.find((item) => item.kind === 'special')?.id).toBe('special')
     expect(rebuilt.assignments).toEqual([{ seatId: 'seat-special', studentId: 'kept' }])
   })
+
+  it('rebuilds exactly the configured main grid without altering special desks or their assignments', () => {
+    fc.assert(fc.property(
+      fc.integer({ min: 1, max: 5 }),
+      fc.integer({ min: 1, max: 5 }),
+      fc.integer({ min: 0, max: 12 }),
+      (rows, desksPerRow, specialCount) => {
+        const special = Array.from({ length: specialCount }, (_, index) => ({ ...desk(`special-${index}`, index * 10, 100), kind: 'special' as const }))
+        const assignments = special.map((item, index) => ({ seatId: item.seatIds[0], studentId: `student-${index}` }))
+        let id = 0
+        const draft = { id: 'draft', classId: 'class', podium: { x: 0, y: 0, width: 1, height: 1 }, desks: [desk('old', 0, 0), ...special], assignments, createdAt: '', updatedAt: '' }
+        const rebuilt = rebuildRegularLayout(draft, { rows, desksPerRow, capacity: 2 }, { deskId: () => `regular-${id++}`, seatId: () => `seat-${id++}` }, '2026-01-01')
+        expect(rebuilt.desks.filter((item) => item.kind === 'regular')).toHaveLength(rows * desksPerRow)
+        expect(rebuilt.desks.filter((item) => item.kind === 'special').map((item) => item.id)).toEqual(special.map((item) => item.id))
+        expect(rebuilt.assignments).toEqual(assignments)
+      },
+    ), { numRuns: 100 })
+  })
 })

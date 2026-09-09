@@ -1,13 +1,7 @@
 import { useEffect } from 'react'
+import { shouldReloadForControllerChange } from './controllerChange'
 
 const UPDATE_CHECK_INTERVAL_MS = 15 * 60 * 1000
-
-export function shouldReloadForControllerChange(
-  initialController: ServiceWorker | null,
-  hasReloaded: boolean,
-) {
-  return initialController !== null && !hasReloaded
-}
 
 /**
  * Uses the browser service-worker API directly so the same update prompt also
@@ -32,11 +26,15 @@ export function PwaUpdatePrompt() {
     void navigator.serviceWorker.register(serviceWorkerUrl).then((nextRegistration) => {
       if (!active) return
       checkForUpdate = () => {
-        if (navigator.onLine) void nextRegistration.update()
+        // Offline/network failures must not become unhandled promise rejections.
+        if (navigator.onLine) void nextRegistration.update().catch(() => {})
       }
       checkForUpdate()
       interval = window.setInterval(checkForUpdate, UPDATE_CHECK_INTERVAL_MS)
       window.addEventListener('online', checkForUpdate)
+    }).catch(() => {
+      // Storage or network restrictions may prevent registration. The local
+      // application remains usable; registration is retried on the next load.
     })
     return () => {
       active = false

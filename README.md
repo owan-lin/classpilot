@@ -2,7 +2,7 @@
 
 ClassPilot 是一款离线优先的班级座位工作台，当前版本专注于四个核心流程：新建班级、编辑教室、录入学生和查看学生档案。班级数据默认只保存在当前设备。
 
-> 当前版本：v0.3.1。仓库、测试和示例只使用虚构学生数据。
+> 本分支版本：v0.4.0。正式版本以发布页为准；仓库、测试和示例只使用虚构学生数据。
 
 ## 立即使用
 
@@ -54,6 +54,7 @@ npm run lint
 npm test
 npm run build
 npm run test:e2e
+npm run acceptance
 ```
 
 Windows 桌面开发：
@@ -66,14 +67,20 @@ npm run desktop:build
 ## 发布
 
 - `main` 只运行检查，不直接改变正式网页版。
-- 同一个 `v*` 标签同时触发网页版和 Windows 版构建；版本号不一致时发布会失败。
+- 同一个 `v*` 标签执行统一流水线：全量验收 → Windows 构建与启动检查 → 暂存安装包 → 部署网页 → 公开桌面下载。任一前置检查失败，两端都不会发布。
+- 网页 `build-info.json` 与安装包旁的 `windows-build-info.json` 标明版本和提交；`SHA256SUMS.txt` 用于校验下载文件。
+- 网页部署与 Release 公开是两个平台操作，无法做到原子切换。若最后一步失败，安装包保留在草稿中，由维护者恢复同次流水线；不得另发不同提交的单端版本。
 - [最新版发布页](https://github.com/owan-lin/classpilot/releases/latest)始终提供当前公开桌面版本。
+
+架构边界、数据兼容策略与验收范围见 [架构说明](docs/ARCHITECTURE.md) 和 [验收记录](docs/ACCEPTANCE-v0.4.md)。桌面版不自动替换已下载的旧 EXE；更新时请从发布页下载同版程序，无需清除本地数据。
 
 ## English
 
 ClassPilot is an offline-first classroom workspace focused on four core flows: create a class, edit a classroom canvas, enter students manually, and view student profiles. The current release supports aligned or free-form desk movement and click-or-drag seating interactions.
 
-Excel roster import, history, full backup, and print/PDF export are not available in v0.3.1.
+The v0.4 branch separates application lifecycle, interactions, presentation, domain rules and persistence. Strict TypeScript, dependency-boundary checks, unit/property tests, browser workflows and a real offline reload test form the acceptance gate. Web and Windows releases are built from the same commit.
+
+Excel roster import, history, full backup, and print/PDF export are not currently exposed. Browser and Windows storage remain separate; there is no cloud sync or backup exchange UI yet. Do not clear application data when updating.
 
 No real student data belongs in this repository. Classroom records remain on the teacher's device by default.
 

@@ -106,4 +106,41 @@ describe('DexieClassRepository', () => {
     })).rejects.toThrow('容量')
   })
 
+  it('does not let a draft ID from one class overwrite another class draft', async () => {
+    const { repository } = createRepository()
+    const first = await repository.createClass({ name: '甲班', grade: '', academicYear: '' })
+    const second = await repository.createClass({ name: '乙班', grade: '', academicYear: '' })
+    const firstDraft: LayoutDraft = {
+      id: 'shared-draft-id', classId: first.id,
+      podium: { x: 0, y: 0, width: 100, height: 50 }, desks: [], assignments: [],
+      createdAt: '2026-08-27T00:00:00.000Z', updatedAt: '2026-08-27T00:00:00.000Z',
+    }
+    await repository.saveDraft(firstDraft)
+    await expect(repository.saveDraft({ ...firstDraft, classId: second.id })).rejects.toThrow('其他班级')
+    await expect(repository.getDraft(first.id)).resolves.toMatchObject({ classId: first.id, id: firstDraft.id })
+    await expect(repository.getDraft(second.id)).resolves.toBeUndefined()
+  })
+
+  it('cleans a deleted student from classmates, drafts, and grades atomically', async () => {
+    const { repository } = createRepository()
+    const classroom = await repository.createClass({ name: '关联清理班', grade: '', academicYear: '' })
+    const removed = await repository.createStudent(newStudent(classroom.id, '01'))
+    const classmate = await repository.createStudent({ ...newStudent(classroom.id, '02'), constraints: {
+      frontPreference: 'none', avoidAdjacentStudentIds: [removed.id], preferredDeskMateStudentIds: [removed.id],
+    } })
+    await repository.createGrade({ classId: classroom.id, studentId: removed.id, subject: '数学', examName: '月考', examDate: '2026-02-28', score: 80, fullScore: 100 })
+    await repository.deleteStudent(removed.id)
+    expect(await repository.listGrades(classroom.id)).toEqual([])
+    await expect(repository.getStudent(classmate.id)).resolves.toMatchObject({ constraints: {
+      avoidAdjacentStudentIds: [], preferredDeskMateStudentIds: [],
+    } })
+  })
+
+  it('rejects impossible ISO calendar dates', async () => {
+    const { repository } = createRepository()
+    const classroom = await repository.createClass({ name: '日期班', grade: '', academicYear: '' })
+    const student = await repository.createStudent(newStudent(classroom.id))
+    await expect(repository.createGrade({ classId: classroom.id, studentId: student.id, subject: '数学', examName: '测验', examDate: '2026-02-29', score: 80, fullScore: 100 })).rejects.toThrow('ISO 日期')
+  })
+
 })

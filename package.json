@@ -1,7 +1,7 @@
 {
   "name": "classpilot",
   "private": true,
-  "version": "0.3.7",
+  "version": "0.4.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -12,20 +12,20 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
-    "check": "npm run lint && npm run test && npm run build",
+    "architecture:check": "node scripts/check-architecture.mjs",
+    "typecheck": "tsc -b && tsc -p tsconfig.test.json",
+    "check": "npm run architecture:check && npm run typecheck && npm run lint && npm run test && npm run build",
+    "acceptance": "npm run release:check && npm run check && npm run test:e2e",
     "release:check": "node scripts/check-release-version.mjs",
     "tauri": "tauri",
     "desktop:dev": "tauri dev",
     "desktop:build": "tauri build"
   },
   "dependencies": {
-    "@dnd-kit/core": "^6.3.1",
-    "@tauri-apps/api": "^2.11.1",
     "dexie": "^4.4.5",
     "lucide-react": "^1.34.0",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8",
-    "zod": "^4.4.3"
+    "react-dom": "^19.2.8"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",

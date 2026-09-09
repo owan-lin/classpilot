@@ -9,9 +9,8 @@ export default defineConfig({
   reporter: [['list'], ['html', { open: 'never' }]],
   use: {
     baseURL: 'http://127.0.0.1:4173',
-    // PWA lifecycle is covered by the build contract.  Blocking workers here
-    // keeps fresh E2E browser contexts from being reloaded mid-interaction when
-    // a newly installed worker claims the page.
+    // Interaction tests always use fresh bundles. offline.spec.ts explicitly
+    // enables real service workers to verify production caching and reloads.
     serviceWorkers: 'block',
     screenshot: 'only-on-failure',
     trace: 'on-first-retry',
@@ -19,7 +18,7 @@ export default defineConfig({
   webServer: {
     command: 'npm run build && npm run preview -- --host 127.0.0.1',
     port: 4173,
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: false,
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
 })

@@ -1,4 +1,5 @@
 import type { GradeImportPreview, GradeImportRow } from '../../domain/types'
+import { validateGradeInput } from '../../domain/grades'
 
 const aliases: Record<string, string[]> = {
   studentNo: ['学号', 'studentno', 'student number'], studentName: ['姓名', 'name'], subject: ['学科', 'subject'], examName: ['考试', '考试名称', 'exam', 'exam name'], examDate: ['日期', '考试日期', 'date', 'exam date'], score: ['得分', 'score'], fullScore: ['满分', 'full score'], note: ['备注', 'note'],
@@ -21,14 +22,17 @@ export function previewGradeCsv(text: string, mapping: Record<string, string> = 
   const column = (key: string) => mapping[key] ?? headers.find((header) => aliases[key]?.includes(normalized(header)))
   const value = (cells: string[], key: string) => { const header = column(key); const index = header ? headers.indexOf(header) : -1; return index < 0 ? '' : (cells[index] ?? '').trim() }
   const rows: GradeImportRow[] = matrix.slice(1).map((cells, index) => {
-    const studentNo = value(cells, 'studentNo'), studentName = value(cells, 'studentName'), subject = value(cells, 'subject'), examName = value(cells, 'examName'), examDate = value(cells, 'examDate'), score = Number(value(cells, 'score')), fullScore = Number(value(cells, 'fullScore')), errors: string[] = []
+    const studentNo = value(cells, 'studentNo'), studentName = value(cells, 'studentName'), subject = value(cells, 'subject'), examName = value(cells, 'examName'), examDate = value(cells, 'examDate'), scoreText = value(cells, 'score'), fullScoreText = value(cells, 'fullScore'), score = Number(scoreText), fullScore = Number(fullScoreText), errors: string[] = []
     if (!studentNo && !studentName) errors.push('缺少学号或姓名')
     if (!studentNo) errors.push('当前版本导入需要学号匹配学生')
-    if (!subject) errors.push('缺少学科'); if (!examName) errors.push('缺少考试名称')
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(examDate)) errors.push('日期必须为 YYYY-MM-DD')
-    if (!Number.isFinite(score) || score < 0) errors.push('得分无效')
-    if (!Number.isFinite(fullScore) || fullScore <= 0) errors.push('满分无效')
-    if (Number.isFinite(score) && Number.isFinite(fullScore) && score > fullScore) errors.push('得分不能大于满分')
+    try {
+      // Explicit blank checks avoid Number('') becoming a valid zero score.
+      if (!scoreText) throw new Error('得分不能为空')
+      if (!fullScoreText) throw new Error('满分不能为空')
+      validateGradeInput({ subject, examName, examDate, score, fullScore, ...(value(cells, 'note') ? { note: value(cells, 'note') } : {}) })
+    } catch (error) {
+      errors.push(error instanceof Error ? error.message : '成绩数据无效')
+    }
     return { rowNumber: index + 2, raw: Object.fromEntries(headers.map((header, cellIndex) => [header, cells[cellIndex] ?? ''])), studentNo, studentName, ...(errors.length ? {} : { grade: { subject, examName, examDate, score, fullScore, ...(value(cells, 'note') ? { note: value(cells, 'note') } : {}) } }), errors }
   })
   return { rows, validCount: rows.filter((row) => !row.errors.length).length, errorCount: rows.filter((row) => row.errors.length).length }

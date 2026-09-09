@@ -1,1 +1,477 @@
-.primary,.quiet,.danger{min-height:44px;display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:0 14px;border:1px solid transparent;border-radius:6px;font-weight:750}.primary{color:#fff;background:var(--brand)}.quiet{color:#1b597e;background:#fff;border-color:#bcd1dc}.danger{color:#fff;background:var(--danger)}.mode-strip{margin:0 0 16px;padding:0 0 12px;color:var(--muted);border-bottom:1px solid var(--line)}.segment{display:flex;width:max-content;padding:3px;background:#e7f0f4;border-radius:6px}.segment button{min-height:34px;padding:0 10px;color:var(--muted);background:transparent;border:0;border-radius:4px}.segment .active{color:#fff;background:var(--brand)}.room-tools{display:grid;gap:10px}.room-tools .quiet{width:100%;justify-content:flex-start}.pool,.student-form,.roster,.grade-tools{margin:0 0 16px;padding:0 0 16px;border:0;border-bottom:1px solid var(--line)}.pool h2,.roster h2,.student-form h2,.grade-tools h2{margin:0 0 12px;font-size:17px}.pool ul,.roster ul,.profile-grade-card ul{margin:0;padding:0;list-style:none}.pool li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px;margin-top:8px}.pool-student{width:100%;min-height:52px;padding:8px 10px;color:var(--ink);text-align:left;background:#f8fbfc;border:1px solid var(--line);border-radius:6px}.profile-link,.icon{min-height:40px;padding:0 8px;color:#1b597e;background:transparent;border:0;border-radius:4px}.student-form label,.new-class label,.profile-grade-card form label{display:grid;gap:6px;margin-top:12px;font-size:13px;font-weight:700}.student-form input,.student-form select,.student-form textarea,.new-class input,.new-class select,.profile-grade-card form input{width:100%;min-height:44px;padding:9px 10px;color:var(--ink);border:1px solid var(--line-strong);border-radius:6px}.student-form textarea{min-height:94px}.student-form--grades{display:grid;grid-template-columns:1fr;gap:12px}.student-form--grades label{margin:0}.form-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:20px}.overlay{position:fixed;z-index:30;inset:0;display:grid;place-items:center;padding:24px;background:rgb(12 37 55 / 42%)}.profile,.new-class{position:relative;width:min(460px,100%);max-height:calc(100dvh - 48px);overflow:auto;padding:24px;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow)}.profile h2,.new-class h2{margin:0;padding-right:40px;font-size:21px}.close{position:absolute;top:10px;right:10px;width:36px;height:36px;background:transparent;border:0}.profile [role="tablist"]{display:flex;gap:4px;margin:20px 0 16px;padding:4px;background:#f0f5f7;border:1px solid var(--line);border-radius:6px}.profile [role="tab"]{min-height:36px;flex:1;color:var(--muted);background:transparent;border:0;border-radius:4px;font-weight:700}.profile [role="tab"][aria-selected="true"]{color:var(--ink);background:#fff;box-shadow:0 1px 2px rgb(23 50 77 / 10%)}.profile dl{display:grid;grid-template-columns:1fr 1fr;gap:8px}.profile dl div{padding:10px;background:#f7fafb;border:1px solid var(--line);border-radius:6px}.profile dt{color:var(--muted);font-size:12px}.profile dd{margin:4px 0 0;font-weight:700}.profile-grade-card{padding-top:4px}.profile-grade-card h3{margin:16px 0 10px;font-size:16px}.profile-grade-card li{padding:10px 0;border-top:1px solid var(--line)}.profile-grade-card form{display:grid;gap:12px;margin-top:20px;padding-top:16px;border-top:1px solid var(--line)}.profile-grade-card form label{margin:0}.profile-grade-card form .primary{margin-top:8px}.new-class{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}.new-class h2,.new-class>p,.new-class>button,.new-class>label:first-of-type,.new-class>.primary{grid-column:1/-1}.new-class>p{margin:16px 0 0;padding:10px 12px;color:var(--muted);background:#f5f8f9;border:1px solid var(--line);border-radius:6px}.new-class>.primary{width:100%;min-height:48px;margin-top:20px}.status{position:fixed;z-index:20;bottom:12px;left:50%;padding:7px 11px;background:#fff;border:1px solid var(--line);border-radius:6px;box-shadow:var(--shadow);transform:translateX(-50%)}
+/* Shared actions, panel content, forms and modal surfaces. */
+
+.primary,
+.quiet,
+.danger {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  font-weight: 750;
+}
+
+.primary {
+  color: var(--surface);
+  background: var(--brand);
+}
+
+.quiet {
+  color: var(--ink-action);
+  background: var(--surface);
+  border-color: var(--line-control);
+}
+
+.danger {
+  color: var(--surface);
+  background: var(--danger);
+}
+
+.mode-strip {
+  margin: 0 0 16px;
+  padding: 0 0 12px;
+  color: var(--muted);
+  border-bottom: 1px solid var(--line);
+}
+
+.segment {
+  display: flex;
+  width: max-content;
+  padding: 3px;
+  background: var(--surface-segment);
+  border-radius: var(--radius-sm);
+}
+
+.segment button {
+  min-height: 34px;
+  padding: 0 10px;
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-xs);
+}
+
+.segment .active {
+  color: var(--surface);
+  background: var(--brand);
+}
+
+.room-tools {
+  display: grid;
+  gap: 10px;
+}
+
+.room-tools .quiet {
+  width: 100%;
+  justify-content: flex-start;
+}
+
+.pool,
+.student-form,
+.roster,
+.grade-tools {
+  margin: 0 0 16px;
+  padding: 0 0 16px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.pool h2,
+.roster h2,
+.student-form h2,
+.grade-tools h2 {
+  margin: 0 0 12px;
+  font-size: 16px;
+  font-weight: 650;
+  line-height: 1.3;
+}
+
+.pool h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pool h2 svg {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+}
+
+.roster li > button:first-child b,
+.pool-student b {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.pool-student > b {
+  display: block;
+}
+
+.pool-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  color: var(--muted);
+}
+
+.pool ul,
+.roster ul,
+.profile-grade-card ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pool li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.pool-student {
+  width: 100%;
+  min-height: 52px;
+  padding: 8px 10px;
+  color: var(--ink);
+  text-align: left;
+  background: var(--surface-subtle);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.profile-link,
+.icon {
+  min-height: 40px;
+  padding: 0 8px;
+  color: var(--ink-action);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-xs);
+}
+
+.student-form label,
+.new-class label,
+.profile-grade-card form label {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.student-form input,
+.student-form select,
+.student-form textarea,
+.new-class input,
+.new-class select,
+.profile-grade-card form input {
+  width: 100%;
+  min-height: 44px;
+  padding: 9px 10px;
+  color: var(--ink);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+}
+
+.student-form textarea {
+  min-height: 94px;
+}
+
+.student-form--grades {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.student-form--grades label,
+.profile-grade-card form label {
+  margin: 0;
+}
+
+.form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+/* CSV import stays compact until opened, then gives its controls breathing room. */
+.grade-import {
+  margin: 0 0 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.grade-import summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  color: var(--ink);
+  cursor: pointer;
+  font-weight: 700;
+  list-style-position: inside;
+}
+
+.grade-import summary small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.grade-import[open] summary {
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.grade-import textarea {
+  width: 100%;
+  min-height: 112px;
+  padding: 10px;
+  color: var(--ink);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  resize: vertical;
+}
+
+.grade-import .form-actions {
+  margin-top: 12px;
+}
+
+.grade-preview {
+  margin-top: 12px;
+  padding: 10px 12px;
+  color: var(--muted);
+  background: var(--surface-soft);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.grade-preview p {
+  margin: 6px 0 0;
+}
+
+/* Modal contract: one scrim, then a scrollable foreground surface. */
+.overlay {
+  position: fixed;
+  z-index: var(--z-overlay);
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: var(--scrim);
+}
+
+.profile,
+.new-class {
+  position: relative;
+  width: min(460px, 100%);
+  max-height: calc(100dvh - 48px);
+  overflow: auto;
+  padding: 24px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow);
+}
+
+.profile h2,
+.new-class h2 {
+  margin: 0;
+  padding-right: 40px;
+  font-size: 21px;
+}
+
+.close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 36px;
+  height: 36px;
+  background: transparent;
+  border: 0;
+}
+
+.profile [role="tablist"] {
+  display: flex;
+  gap: 4px;
+  margin: 20px 0 16px;
+  padding: 4px;
+  background: var(--surface-tab);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.profile [role="tab"] {
+  min-height: 36px;
+  flex: 1;
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-xs);
+  font-weight: 700;
+}
+
+.profile [role="tab"][aria-selected="true"] {
+  color: var(--ink);
+  background: var(--surface);
+  box-shadow: var(--shadow-tab);
+}
+
+.profile dl {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.profile dl div {
+  padding: 10px;
+  background: var(--surface-muted);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.profile dt {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.profile dd {
+  margin: 4px 0 0;
+  font-weight: 700;
+}
+
+.profile-grade-card {
+  padding-top: 4px;
+}
+
+.profile-grade-card h3 {
+  margin: 16px 0 10px;
+  font-size: 16px;
+}
+
+.profile-grade-card li {
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+
+.profile-grade-card form {
+  display: grid;
+  gap: 12px;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.profile-grade-card form .primary {
+  margin-top: 8px;
+}
+
+.new-class {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 12px;
+}
+
+.new-class h2,
+.new-class > p,
+.new-class > button,
+.new-class > label:first-of-type,
+.new-class > .primary {
+  grid-column: 1 / -1;
+}
+
+.new-class > p {
+  margin: 16px 0 0;
+  padding: 10px 12px;
+  color: var(--muted);
+  background: var(--surface-soft);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.new-class > .primary {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 20px;
+}
+
+.status {
+  position: fixed;
+  z-index: var(--z-status);
+  bottom: 12px;
+  left: 50%;
+  padding: 7px 11px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow);
+  transform: translateX(-50%);
+}
+
+/* Keep feedback inside the canvas band, opposite the zoom controls. */
+@media (min-width: 1025px) {
+  .status {
+    left: calc(var(--class-open) + 16px);
+    transform: none;
+  }
+
+  .pilot:has(.class-rail:not(.open)) .status {
+    left: calc(var(--class-rail) + 16px);
+  }
+}
+
+@media (max-width: 1024px) {
+  .status {
+    right: var(--mobile-gutter);
+    bottom: calc(var(--mobile-gutter) + 64px);
+    left: var(--mobile-gutter);
+    max-width: calc(100vw - (var(--mobile-gutter) * 2));
+    transform: none;
+  }
+}
+
+/* Render-failure recovery keeps the same quiet workbench language and CTA. */
+.app-recovery {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px;
+  color: var(--ink);
+  background: var(--canvas);
+  text-align: center;
+}
+
+.app-recovery h1,
+.app-recovery p {
+  margin: 0;
+}
+
+.app-recovery h1 {
+  font-size: 21px;
+}
+
+.app-recovery p {
+  max-width: 34rem;
+  color: var(--muted);
+}
+
+.app-recovery button {
+  min-height: 44px;
+  padding: 0 14px;
+  color: var(--surface);
+  background: var(--brand);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  font-weight: 750;
+}

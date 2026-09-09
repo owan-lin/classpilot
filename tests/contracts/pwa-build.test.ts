@@ -50,6 +50,9 @@ describe('PWA build isolation', () => {
     try {
       const index = readFileSync(join(output, 'index.html'), 'utf8')
       const serviceWorker = readFileSync(join(output, 'sw.js'), 'utf8')
+      const identity = JSON.parse(readFileSync(join(output, 'build-info.json'), 'utf8'))
+      expect(identity).toMatchObject({ platform: 'web', version: JSON.parse(readFileSync('package.json', 'utf8')).version })
+      expect(identity.commit).toMatch(/^[a-f0-9]{40}$/)
       expect(index).toContain('registerSW.js')
       expect(readdirSync(output)).toEqual(expect.arrayContaining(['manifest.webmanifest', 'sw.js']))
       expect(serviceWorker).toContain('self.skipWaiting()')
@@ -65,6 +68,9 @@ describe('PWA build isolation', () => {
     try {
       const index = readFileSync(join(output, 'index.html'), 'utf8')
       expect(index).not.toMatch(/registerSW|serviceWorker|manifest\.webmanifest/i)
+      const identity = JSON.parse(readFileSync(join(output, 'build-info.json'), 'utf8'))
+      expect(identity).toMatchObject({ platform: 'windows', version: JSON.parse(readFileSync('package.json', 'utf8')).version })
+      expect(identity.commit).toMatch(/^[a-f0-9]{40}$/)
       expect(readdirSync(output)).not.toEqual(expect.arrayContaining(['manifest.webmanifest', 'sw.js', 'registerSW.js']))
       const entry = readdirSync(join(output, 'assets')).find((file) => /^index-.*\.js$/.test(file))
       expect(entry).toBeDefined()

@@ -1,7 +1,9 @@
+/* Mobile drawer dismissal controls. */
+
 @media (max-width: 1024px) {
   .rail-close {
     position: fixed;
-    z-index: 26;
+    z-index: var(--z-drawer-close);
     top: 12px;
     right: 12px;
     width: 44px;
@@ -11,11 +13,18 @@
     padding: 0;
     color: var(--ink);
     border: 0;
-    border-radius: 6px;
+    border-radius: var(--radius-sm);
     background: var(--surface);
     box-shadow: var(--shadow);
   }
 
-  .rail-close svg { width: 20px; height: 20px; }
-  .class-rail > .rail-close { right: auto; left: calc(min(360px, 88vw) - 56px); }
+  .rail-close svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .class-rail > .rail-close {
+    right: auto;
+    left: calc(var(--drawer-width) - 56px);
+  }
 }

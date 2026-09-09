@@ -1,2 +1,142 @@
-@media(max-width:1024px){.pilot{display:block}.workbench-canvas{position:absolute;inset:0}.class-rail,.tool-rail{display:block}.class-rail>.rail-toggle,.tool-rail>.rail-toggle,.rail-new{position:fixed;z-index:22;top:8px;width:48px;min-height:48px;margin:0;border-radius:6px;box-shadow:var(--shadow)}.class-rail>.rail-toggle{left:8px}.rail-new{top:64px;left:8px}.tool-rail>.rail-toggle{right:8px}.rail-wordmark,.tool-rail>nav{display:none}.rail-panel,.tool-panel{position:fixed;z-index:24;top:0;bottom:0;width:min(360px,88vw);padding:72px 16px 24px}.rail-panel{left:0;transform:translateX(-105%)}.tool-panel{right:0;transform:translateX(105%)}.class-rail.open>.rail-panel,.tool-rail.open>.tool-panel{opacity:1;visibility:visible;transform:translateX(0)}.class-rail:not(.open)>.rail-panel,.tool-rail:not(.open)>.tool-panel{opacity:0;visibility:hidden}.canvas-title{top:14px;left:68px}.canvas-title span,.row-labels{display:none}.canvas-scroll{padding:76px 16px 24px}.canvas-scroll>.canvas{margin-left:0}.canvas-zoom{right:16px;bottom:16px}}@media(max-width:560px){body{font-size:16px}.overlay{align-items:end;padding:12px}.profile,.new-class{width:100%;max-height:calc(100dvh - 24px);padding:20px}.profile dl,.new-class{grid-template-columns:1fr}.new-class>*{grid-column:1/-1!important}.status{max-width:calc(100vw - 24px)}}@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important}}
+/* Responsive geometry. Layer-specific drawer stacking lives in drawers.css. */
 
+@media (max-width: 1024px) {
+  .pilot {
+    display: block;
+  }
+
+  .workbench-canvas {
+    position: absolute;
+    inset: 0;
+  }
+
+  .class-rail,
+  .tool-rail {
+    display: block;
+  }
+
+  .class-rail > .rail-toggle,
+  .tool-rail > .rail-toggle,
+  .rail-new {
+    position: fixed;
+    z-index: var(--z-mobile-toggle);
+    top: 8px;
+    width: 48px;
+    min-height: 48px;
+    margin: 0;
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow);
+  }
+
+  .class-rail > .rail-toggle {
+    left: 8px;
+  }
+
+  .rail-new {
+    top: 64px;
+    left: 8px;
+  }
+
+  .tool-rail > .rail-toggle {
+    right: 8px;
+  }
+
+  .rail-wordmark,
+  .tool-rail > nav {
+    display: none;
+  }
+
+  .rail-panel,
+  .tool-panel {
+    position: fixed;
+    z-index: var(--z-drawer-panel);
+    top: 0;
+    bottom: 0;
+    width: var(--drawer-width);
+    padding: 72px 16px 24px;
+  }
+
+  .rail-panel {
+    left: 0;
+    transform: translateX(-105%);
+  }
+
+  .tool-panel {
+    right: 0;
+    transform: translateX(105%);
+  }
+
+  .class-rail.open > .rail-panel,
+  .tool-rail.open > .tool-panel {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(0);
+  }
+
+  .class-rail:not(.open) > .rail-panel,
+  .tool-rail:not(.open) > .tool-panel {
+    opacity: 0;
+    visibility: hidden;
+  }
+
+  .canvas-title {
+    top: 14px;
+    left: 68px;
+  }
+
+  .canvas-title span,
+  .row-labels {
+    display: none;
+  }
+
+  .canvas-scroll {
+    padding: 76px var(--mobile-gutter) 24px;
+  }
+
+  .canvas-scroll > .canvas {
+    margin-left: 0;
+  }
+
+  .canvas-zoom {
+    right: var(--mobile-gutter);
+    bottom: var(--mobile-gutter);
+  }
+}
+
+@media (max-width: 560px) {
+  body {
+    font-size: 16px;
+  }
+
+  .overlay {
+    align-items: end;
+    padding: 12px;
+  }
+
+  .profile,
+  .new-class {
+    width: 100%;
+    max-height: calc(100dvh - 24px);
+    padding: 20px;
+  }
+
+  .profile dl,
+  .new-class {
+    grid-template-columns: 1fr;
+  }
+
+  .status {
+    max-width: calc(100vw - 24px);
+  }
+}
+
+/* This override intentionally remains important so later component transitions
+   cannot defeat the user's reduced-motion preference. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition: none !important;
+  }
+}

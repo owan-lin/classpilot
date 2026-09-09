@@ -14,6 +14,9 @@ dist-ssr
 playwright-report
 test-results
 coverage
+.playwright-cli/
+output/
+artifacts/
 *.classpilot.json
 *.classpilot-backup.json
 src-tauri/target

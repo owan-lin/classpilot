@@ -1,14 +1,18 @@
+/* Mobile drawer overlay and stacking context. Loaded after responsive.css. */
+
 @media (max-width: 1024px) {
   .drawer-backdrop {
     position: fixed;
-    z-index: 23;
+    z-index: var(--z-drawer-backdrop);
     inset: 0;
     display: block;
     visibility: hidden;
     pointer-events: none;
-    background: rgb(12 37 55 / 42%);
+    background: var(--scrim);
     opacity: 0;
-    transition: opacity var(--motion), visibility 0s linear var(--motion);
+    transition:
+      opacity var(--motion),
+      visibility 0s linear var(--motion);
   }
 
   .drawer-backdrop.visible {
@@ -18,44 +22,53 @@
     transition-delay: 0s;
   }
 
-  /* Keep the two edge controls above the scrim so either drawer can be
-     switched directly while the other one is open. */
+  /* Edge controls stay above the scrim so either drawer can be switched. */
   .class-rail > .rail-toggle,
   .tool-rail > .rail-toggle,
-  .rail-new { z-index: 27; }
+  .rail-new {
+    z-index: var(--z-drawer-toggle);
+  }
 
-  /* The hosts must share the overlay layer too: a fixed child cannot escape a
-     lower stacking context (or the base rail's clipping) by z-index alone.
-     Keep the transparent hosts click-through so only their controls/panels
-     sit above the scrim. */
+  /* Hosts share the overlay layer; only their controls and panels receive input. */
   .class-rail,
   .tool-rail {
-    z-index: 24;
+    z-index: var(--z-drawer-host);
     overflow: visible;
     pointer-events: none;
   }
 
   .class-rail > *,
-  .tool-rail > * { pointer-events: auto; }
+  .tool-rail > * {
+    pointer-events: auto;
+  }
 
   .rail-panel,
   .tool-panel {
-    z-index: 25;
+    z-index: var(--z-drawer-panel);
     box-sizing: border-box;
     max-width: 88vw;
   }
 
   .class-rail > .rail-close,
-  .tool-rail:not(.open) .rail-close { display: none; }
+  .tool-rail:not(.open) .rail-close {
+    display: none;
+  }
 
-  .class-rail.open > .rail-close { display: grid; }
+  .class-rail.open > .rail-close {
+    display: grid;
+  }
+
   .class-rail.open > .rail-toggle,
   .class-rail.open > .rail-new,
-  .tool-rail.open > .rail-toggle { visibility: hidden; pointer-events: none; }
+  .tool-rail.open > .rail-toggle {
+    visibility: hidden;
+    pointer-events: none;
+  }
 
+  /* The tool rail's compact nav remains visible beside its open panel. */
   .tool-rail.open > nav {
     position: fixed;
-    z-index: 26;
+    z-index: var(--z-drawer-close);
     top: 72px;
     right: 0;
     bottom: 0;
@@ -65,5 +78,7 @@
     background: var(--nav);
   }
 
-  .tool-rail.open > .tool-panel { padding-right: 88px; }
+  .tool-rail.open > .tool-panel {
+    padding-right: 88px;
+  }
 }

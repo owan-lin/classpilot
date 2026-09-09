@@ -14,6 +14,7 @@ import type {
   StudentRecord,
   StudentRecordChanges,
 } from '../domain/types'
+import { validateGradeInput } from '../domain/grades'
 import { ClassPilotDatabase } from './database'
 
 export interface RepositoryDependencies {
@@ -44,15 +45,6 @@ function positiveInteger(value: number, label: string): number {
 function deskCapacity(value: number): 1 | 2 {
   if (value !== 1 && value !== 2) throw new Error('每桌容量只能为 1 或 2')
   return value
-}
-
-function validateGrade(input: Omit<NewGradeRecord, 'classId' | 'studentId'>): Omit<NewGradeRecord, 'classId' | 'studentId'> {
-  const subject = requireText(input.subject, '学科')
-  const examName = requireText(input.examName, '考试名称')
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.examDate) || Number.isNaN(Date.parse(`${input.examDate}T00:00:00Z`))) throw new Error('考试日期必须是 ISO 日期')
-  if (!Number.isFinite(input.fullScore) || input.fullScore <= 0) throw new Error('满分必须大于 0')
-  if (!Number.isFinite(input.score) || input.score < 0 || input.score > input.fullScore) throw new Error('得分必须在 0 到满分之间')
-  return { ...input, subject, examName, note: input.note?.trim() || undefined }
 }
 
 export function canonicalStudentNo(studentNo: string): string {
@@ -246,6 +238,18 @@ export class DexieClassRepository implements ClassRepository {
       if (!student) return
       await this.database.students.delete(id)
       await this.database.grades.where('studentId').equals(id).delete()
+      // Constraints are class-local references. Leaving the deleted ID on peers
+      // makes future seating warnings refer to a student who no longer exists.
+      await this.database.students.where('classId').equals(student.classId).modify((classmate) => {
+        const constraints = classmate.constraints
+        const avoidAdjacentStudentIds = constraints.avoidAdjacentStudentIds.filter((studentId) => studentId !== id)
+        const preferredDeskMateStudentIds = constraints.preferredDeskMateStudentIds.filter((studentId) => studentId !== id)
+        if (avoidAdjacentStudentIds.length !== constraints.avoidAdjacentStudentIds.length
+          || preferredDeskMateStudentIds.length !== constraints.preferredDeskMateStudentIds.length) {
+          classmate.constraints = { ...constraints, avoidAdjacentStudentIds, preferredDeskMateStudentIds }
+          classmate.updatedAt = this.dependencies.now()
+        }
+      })
       const draft = await this.database.drafts.where('classId').equals(student.classId).first()
       if (draft?.assignments.some(({ studentId }) => studentId === id)) {
         await this.database.drafts.put({
@@ -266,6 +270,10 @@ export class DexieClassRepository implements ClassRepository {
     await this.database.transaction('rw', [this.database.classes, this.database.students, this.database.drafts], async () => {
       await requireRecord(() => this.database.classes.get(draft.classId), '班级')
       const existing = await this.database.drafts.where('classId').equals(draft.classId).first()
+      const sameId = await this.database.drafts.get(draft.id)
+      if (!existing && sameId && sameId.classId !== draft.classId) {
+        throw new Error('草稿 ID 已被其他班级使用')
+      }
       const seatIds = draft.desks.flatMap((desk) => desk.seatIds)
       if (new Set(draft.desks.map(({ id }) => id)).size !== draft.desks.length) {
         throw new Error('草稿包含重复课桌')
@@ -285,11 +293,13 @@ export class DexieClassRepository implements ClassRepository {
       }
       const validSeats = new Set(seatIds)
       if (draft.assignments.some(({ seatId }) => !validSeats.has(seatId))) throw new Error('草稿引用了不存在的座位')
-      const classStudentIds = new Set(
-        (await this.database.students.where('classId').equals(draft.classId).primaryKeys()).map(String),
-      )
+      const classStudents = await this.database.students.where('classId').equals(draft.classId).toArray()
+      const classStudentIds = new Set(classStudents.map(({ id }) => id))
       if (draft.assignments.some(({ studentId }) => !classStudentIds.has(studentId))) {
         throw new Error('草稿引用了其他班级或不存在的学生')
+      }
+      if (draft.assignments.some(({ studentId }) => classStudents.find((student) => student.id === studentId)?.archived)) {
+        throw new Error('草稿不能安排已归档学生')
       }
       const timestamp = this.dependencies.now()
       const record: LayoutDraft = {
@@ -317,7 +327,7 @@ export class DexieClassRepository implements ClassRepository {
       const student = await requireRecord(() => this.database.students.get(input.studentId), '学生')
       if (student.classId !== input.classId) throw new Error('成绩学生不属于当前班级')
       const timestamp = this.dependencies.now()
-      const record: GradeRecord = { ...validateGrade(input), classId: input.classId, studentId: input.studentId, id: this.dependencies.createId(), createdAt: timestamp, updatedAt: timestamp }
+      const record: GradeRecord = { ...validateGradeInput(input), classId: input.classId, studentId: input.studentId, id: this.dependencies.createId(), createdAt: timestamp, updatedAt: timestamp }
       await this.database.grades.add(record)
       return clone(record)
     })
@@ -326,7 +336,7 @@ export class DexieClassRepository implements ClassRepository {
   async updateGrade(id: EntityId, changes: GradeRecordChanges): Promise<GradeRecord> {
     return this.database.transaction('rw', this.database.grades, async () => {
       const current = await requireRecord(() => this.database.grades.get(id), '成绩')
-      const next = { ...current, ...validateGrade({ ...current, ...clone(changes) }), id: current.id, classId: current.classId, studentId: current.studentId, createdAt: current.createdAt, updatedAt: this.dependencies.now() }
+      const next = { ...current, ...validateGradeInput({ ...current, ...clone(changes) }), id: current.id, classId: current.classId, studentId: current.studentId, createdAt: current.createdAt, updatedAt: this.dependencies.now() }
       await this.database.grades.put(next)
       return clone(next)
     })
@@ -348,7 +358,7 @@ export class DexieClassRepository implements ClassRepository {
         if (duplicate && strategy === 'reject') throw new Error(`第 ${row.rowNumber} 行存在重复成绩`)
         if (duplicate && strategy === 'skip') { skipped += 1; continue }
         const timestamp = this.dependencies.now()
-        const normalized = validateGrade(grade)
+        const normalized = validateGradeInput(grade)
         if (duplicate) { await this.database.grades.put({ ...duplicate, ...normalized, updatedAt: timestamp }); replaced += 1 } else { await this.database.grades.add({ ...normalized, classId, studentId: student.id, id: this.dependencies.createId(), createdAt: timestamp, updatedAt: timestamp }); created += 1 }
       }
       return { created, replaced, skipped }

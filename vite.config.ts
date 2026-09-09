@@ -1,11 +1,18 @@
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 import { defineConfig } from 'vitest/config'
+import { execFileSync } from 'node:child_process'
+import { readFileSync } from 'node:fs'
 
 // Tauri sets TAURI_ENV_PLATFORM for its pre-build command, including on GitHub Actions.
 // Pages alone needs the repository subpath; desktop bundles must always use root-relative assets.
 const isTauriBuild = Boolean(process.env.TAURI_ENV_PLATFORM)
 const basePath = process.env.GITHUB_ACTIONS && !isTauriBuild ? '/classpilot/' : '/'
+const version = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')).version
+const commit = process.env.GITHUB_SHA || (() => {
+  try { return execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim() }
+  catch { return 'unknown' }
+})()
 const pwaPlugins = isTauriBuild ? [] : [VitePWA({
   registerType: 'autoUpdate',
   injectRegister: 'auto',
@@ -40,6 +47,14 @@ export default defineConfig({
   base: basePath,
   define: { __CLASSPILOT_TAURI__: JSON.stringify(isTauriBuild) },
   plugins: [
+    {
+      name: 'classpilot-build-identity',
+      generateBundle() {
+        this.emitFile({ type: 'asset', fileName: 'build-info.json', source: JSON.stringify({
+          version, commit, platform: isTauriBuild ? 'windows' : 'web',
+        }, null, 2) })
+      },
+    },
     react(),
     ...pwaPlugins,
   ],
