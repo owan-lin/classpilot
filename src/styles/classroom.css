@@ -7,6 +7,23 @@
   background: var(--canvas);
 }
 
+.starting {
+  width: min(400px, calc(100% - 64px));
+  display: grid;
+  justify-items: start;
+  gap: 12px;
+  margin: 96px auto 0;
+  padding: 24px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow);
+}
+
+.starting > svg { width: 24px; height: 24px; color: var(--brand); }
+.starting h2 { margin: 0; font-size: 20px; font-weight: 600; line-height: 28px; }
+.starting .primary, .starting .quiet { margin-top: 4px; }
+
 .canvas-title {
   position: absolute;
   z-index: 3;

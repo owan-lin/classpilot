@@ -1,4 +1,3 @@
-import { gradeTrend } from "../../domain/grades";
 import type { GradeRecord, StudentRecord } from "../../domain/types";
 import { previewGradeCsv } from "./gradeImport";
 
@@ -8,6 +7,8 @@ export function GradeTools({
   onCsv,
   onPreview,
   onImport,
+  error,
+  importing,
   grades,
   students,
 }: {
@@ -16,11 +17,12 @@ export function GradeTools({
   onCsv: (value: string) => void;
   onPreview: () => void;
   onImport: () => void;
+  error: string;
+  importing: boolean;
   grades: GradeRecord[];
   students?: StudentRecord[];
 }) {
-  void students;
-  const trend = gradeTrend(grades);
+  const byId = new Map((students ?? []).map((student) => [student.id, student]));
   return (
     <section className="grade-tools" aria-label="成绩导入与趋势">
       <details className="grade-import">
@@ -34,17 +36,17 @@ export function GradeTools({
           placeholder="学号,学科,考试,日期,得分,满分,备注"
         />
         <div className="form-actions">
-          <button type="button" className="quiet" onClick={onPreview}>
+          <button type="button" className="quiet" disabled={importing} onClick={onPreview}>
             预览
           </button>
           {preview && (
             <button
               type="button"
               className="primary"
-              disabled={preview.errorCount > 0 || preview.validCount === 0}
+              disabled={importing || preview.errorCount > 0 || preview.validCount === 0}
               onClick={onImport}
             >
-              确认导入
+              {importing ? "正在导入…" : "确认导入"}
             </button>
           )}
         </div>
@@ -58,61 +60,20 @@ export function GradeTools({
                   第 {row.rowNumber} 行：{row.errors.join("、")}
                 </p>
               ))}
+            {preview.rows.filter((row) => !row.errors.length).slice(0, 8).map((row) => (
+              <p key={`valid-${row.rowNumber}`}>
+                {row.studentName || row.studentNo} · {row.studentNo} · {row.grade?.subject} · {row.grade?.examName} · {row.grade?.examDate} · {row.grade?.score}/{row.grade?.fullScore}
+              </p>
+            ))}
           </div>
         )}
       </details>
-      <h2>得分率</h2>
-      {trend.length < 4 ? (
-        <p>
-          {trend.length
-            ? trend
-                .map(
-                  (item) =>
-                    `${item.examDate} ${item.subject} ${item.percentage.toFixed(1)}%`,
-                )
-                .join(" · ")
-            : "暂无成绩"}
-        </p>
-      ) : (
-        <>
-          <svg
-            className="grade-trend"
-            viewBox="0 0 360 100"
-            role="img"
-            aria-label="成绩百分比趋势"
-          >
-            <polyline
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="3"
-              points={trend
-                .map(
-                  (item, index) =>
-                    `${index * (340 / Math.max(1, trend.length - 1)) + 10},${95 - item.percentage * 0.8}`,
-                )
-                .join(" ")}
-            />
-          </svg>
-          <table>
-            <thead>
-              <tr>
-                <th>日期</th>
-                <th>学科</th>
-                <th>百分比</th>
-              </tr>
-            </thead>
-            <tbody>
-              {trend.map((item, index) => (
-                <tr key={`${item.examDate}-${item.subject}-${index}`}>
-                  <td>{item.examDate}</td>
-                  <td>{item.subject}</td>
-                  <td>{item.percentage.toFixed(1)}%</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </>
-      )}
+      {error && <p className="form-error" role="alert">{error}</p>}
+      <h2>成绩记录</h2>
+      {grades.length ? <div className="grade-table-scroll" tabIndex={0} aria-label="成绩明细表，可横向滚动"><table className="grade-table">
+        <thead><tr><th>学生</th><th>学科</th><th>考试</th><th>日期</th><th>得分</th></tr></thead>
+        <tbody>{grades.map((grade) => <tr key={grade.id}><td>{byId.get(grade.studentId)?.name ?? "未知学生"}</td><td>{grade.subject}</td><td>{grade.examName}</td><td>{grade.examDate}</td><td>{grade.score}/{grade.fullScore}</td></tr>)}</tbody>
+      </table></div> : <p>暂无成绩。请从学生档案录入，或展开 CSV 导入。</p>}
     </section>
   );
 }

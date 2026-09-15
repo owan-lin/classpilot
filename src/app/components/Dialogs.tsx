@@ -34,9 +34,13 @@ export function ProfileDialog({
   gradeForm,
   setGradeForm,
   saveGrade,
+  gradeError,
+  gradeSaving,
   close,
   editStudent,
   deleteStudent,
+  moveStudent,
+  returnToPool,
 }: {
   profile: StudentRecord;
   profileTab: "profile" | "grades";
@@ -45,9 +49,13 @@ export function ProfileDialog({
   gradeForm: GradeForm;
   setGradeForm: (form: GradeForm) => void;
   saveGrade: (event: FormEvent) => void;
+  gradeError: string;
+  gradeSaving: boolean;
   close: () => void;
   editStudent: (student: StudentRecord) => void;
   deleteStudent: (student: StudentRecord) => void;
+  moveStudent: () => void;
+  returnToPool: () => void;
 }) {
   const dialogRef = useRef<HTMLElement>(null);
   useDialogFocus(Boolean(profile), dialogRef, close);
@@ -118,6 +126,8 @@ export function ProfileDialog({
               >
                 编辑档案
               </button>
+              <button className="quiet" type="button" onClick={moveStudent}>移动座位</button>
+              <button className="quiet" type="button" onClick={returnToPool}>移回待安排</button>
               <button
                 className="danger"
                 type="button"
@@ -148,6 +158,7 @@ export function ProfileDialog({
             )}
             <form onSubmit={saveGrade}>
               <h3>录入成绩</h3>
+              {gradeError && <p className="form-error" role="alert">{gradeError}</p>}
               <label>
                 学科
                 <input
@@ -210,8 +221,8 @@ export function ProfileDialog({
                   }
                 />
               </label>
-              <button type="submit" className="primary">
-                保存成绩
+              <button type="submit" className="primary" disabled={gradeSaving}>
+                {gradeSaving ? "正在保存…" : "保存成绩"}
               </button>
             </form>
           </section>

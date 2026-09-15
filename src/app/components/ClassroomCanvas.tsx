@@ -70,55 +70,12 @@ export function ClassroomCanvas({
   seat,
 }: ClassroomCanvasProps) {
   return (
-    <section
-      ref={canvasScrollRef}
-      className="canvas-scroll"
-      data-testid="classroom-canvas"
-    >
-      <div
-        data-testid="canvas-zoom"
-        role="group"
-        aria-label="画布缩放"
-        aria-valuemin={50}
-        aria-valuemax={150}
-        aria-valuenow={Math.round(canvasZoom * 100)}
-        className="canvas-zoom"
+    <>
+      <section
+        ref={canvasScrollRef}
+        className="canvas-scroll"
+        data-testid="classroom-canvas"
       >
-        <button
-          type="button"
-          aria-label="缩小画布"
-          title="缩小画布"
-          onClick={() => setZoom(canvasZoom - 0.1)}
-        >
-          <ZoomOut aria-hidden="true" />
-        </button>
-        <button
-          type="button"
-          aria-label="重置画布缩放"
-          title="重置为 100%"
-          onClick={() => setCanvasZoom(1)}
-        >
-          <RotateCcw aria-hidden="true" />
-          <span>{Math.round(canvasZoom * 100)}%</span>
-        </button>
-        <button
-          type="button"
-          aria-label="放大画布"
-          title="放大画布"
-          onClick={() => setZoom(canvasZoom + 0.1)}
-        >
-          <ZoomIn aria-hidden="true" />
-        </button>
-        <button
-          type="button"
-          aria-label="适配画布"
-          title="适配画布"
-          onClick={fitCanvas}
-        >
-          <Maximize2 aria-hidden="true" />
-          <span>适配</span>
-        </button>
-      </div>
       <div
         ref={canvasRef}
         className={`canvas view-${view} ${view === "room" && layoutMode === "snap" ? "snap-grid" : ""}`}
@@ -227,8 +184,12 @@ export function ClassroomCanvas({
                         student &&
                         event.dataTransfer.setData("studentId", student.id)
                       }
-                      onDragOver={(event) => event.preventDefault()}
-                      onDrop={(event) => drop(event, seatId)}
+                      onDragOver={(event) => {
+                        if (view === "seating") event.preventDefault();
+                      }}
+                      onDrop={(event) => {
+                        if (view === "seating") drop(event, seatId);
+                      }}
                       onClick={() => {
                         if (student && !(view === "seating" && selectedId)) {
                           openProfile(student);
@@ -260,6 +221,40 @@ export function ClassroomCanvas({
           );
         })}
       </div>
-    </section>
+      </section>
+      <CanvasZoomControls
+        canvasZoom={canvasZoom}
+        setZoom={setZoom}
+        setCanvasZoom={setCanvasZoom}
+        fitCanvas={fitCanvas}
+      />
+    </>
+  );
+}
+
+function CanvasZoomControls({
+  canvasZoom,
+  setZoom,
+  setCanvasZoom,
+  fitCanvas,
+}: Pick<
+  ClassroomCanvasProps,
+  "canvasZoom" | "setZoom" | "setCanvasZoom" | "fitCanvas"
+>) {
+  return (
+    <div
+      data-testid="canvas-zoom"
+      role="group"
+      aria-label="画布缩放"
+      aria-valuemin={50}
+      aria-valuemax={150}
+      aria-valuenow={Math.round(canvasZoom * 100)}
+      className="canvas-zoom"
+    >
+      <button type="button" aria-label="缩小画布" title="缩小画布" onClick={() => setZoom(canvasZoom - 0.1)}><ZoomOut aria-hidden="true" /></button>
+      <button type="button" aria-label="重置画布缩放" title="重置为 100%" onClick={() => setCanvasZoom(1)}><RotateCcw aria-hidden="true" /><span>{Math.round(canvasZoom * 100)}%</span></button>
+      <button type="button" aria-label="放大画布" title="放大画布" onClick={() => setZoom(canvasZoom + 0.1)}><ZoomIn aria-hidden="true" /></button>
+      <button type="button" aria-label="适配画布" title="适配画布" onClick={fitCanvas}><Maximize2 aria-hidden="true" /><span>适配</span></button>
+    </div>
   );
 }

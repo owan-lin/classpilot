@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Check, LayoutGrid, Users } from "lucide-react";
+import { Check, CircleAlert, LayoutGrid, Users } from "lucide-react";
 import { classroomStageFor, regularDeskSpec } from "../domain/layout";
 import { studentGenderAttributes } from "../domain/studentGender";
 import type { ClassRepository, StudentRecord } from "../domain/types";
@@ -33,6 +33,7 @@ function AppWorkbench({ repository }: { repository: ClassRepository }) {
   const [classId, setClassId] = useState<string>();
   const classIdRef = useRef<string | undefined>(undefined);
   const [message, setMessage] = useState("");
+  const messageIsError = /失败|错误|无法|不存在|不足|请填写|已失效/.test(message);
   const {
     classes,
     setClasses,
@@ -42,6 +43,9 @@ function AppWorkbench({ repository }: { repository: ClassRepository }) {
     setDraft,
     grades,
     setGrades,
+    classListState,
+    currentClassState,
+    reloadClasses,
     sessionRef: session,
   } = useClassLifecycle(repository, classId, setMessage);
   const [view, setView] = useState<View>("seating");
@@ -281,6 +285,11 @@ function AppWorkbench({ repository }: { repository: ClassRepository }) {
         setMessage("已取消移动");
         return;
       }
+      if (selectedId) {
+        setSelectedId(undefined);
+        setMessage("已取消移动座位");
+        return;
+      }
       if (profile) {
         setProfile(undefined);
         return;
@@ -299,6 +308,7 @@ function AppWorkbench({ repository }: { repository: ClassRepository }) {
     closeToolRail,
     drag,
     profile,
+    selectedId,
     toolRailOpen,
   ]);
   const fitCanvas = () => {
@@ -345,6 +355,7 @@ function AppWorkbench({ repository }: { repository: ClassRepository }) {
         pool={pool}
         selectedId={selectedId}
         setSelectedId={setSelectedId}
+        cancelMove={actions.cancelSeatMove}
         openProfile={actions.openProfile}
       />
     ) : view === "room" ? (
@@ -360,10 +371,12 @@ function AppWorkbench({ repository }: { repository: ClassRepository }) {
         form={actions.studentForm}
         editingStudent={actions.editingStudent}
         error={actions.studentError}
+        studentSaving={actions.studentSaving}
         setForm={actions.setStudentForm}
         saveStudent={actions.saveStudent}
         openProfile={actions.openProfile}
         editStudent={actions.editStudent}
+        cancelEdit={actions.resetStudentEditor}
       />
     ) : (
       <GradesPanel
@@ -372,9 +385,11 @@ function AppWorkbench({ repository }: { repository: ClassRepository }) {
         gradeCsv={actions.gradeCsv}
         gradePreview={actions.gradePreview}
         setGradeCsv={actions.setGradeCsv}
-        setGradePreview={actions.setGradePreview}
+        previewGrades={actions.previewGrades}
         importGrades={actions.importGrades}
-        openProfile={actions.openProfile}
+        error={actions.gradeError}
+        importing={actions.gradeImporting}
+        openStudentGrades={actions.openStudentGrades}
       />
     );
 
@@ -453,8 +468,9 @@ function AppWorkbench({ repository }: { repository: ClassRepository }) {
         ) : (
           <section className="starting">
             <LayoutGrid />
-            <h2>{classes.length ? "正在加载班级…" : "先创建一个班级"}</h2>
-            {!classes.length && (
+            <h2>{classListState === "loading" || currentClassState === "loading" ? "正在读取班级…" : classListState === "error" || currentClassState === "error" ? "暂时无法读取班级" : "先创建一个班级"}</h2>
+            {(classListState === "error" || currentClassState === "error") && <button type="button" className="quiet" onClick={() => void reloadClasses()}>重试</button>}
+            {classListState === "ready" && !classes.length && (
               <button
                 type="button"
                 className="primary"
@@ -479,8 +495,8 @@ function AppWorkbench({ repository }: { repository: ClassRepository }) {
       >
         {active && panel}
       </ToolRail>
-      <div className="status" role="status" aria-live="polite">
-        {message && <Check aria-hidden="true" />}
+      <div className={`status ${messageIsError ? "status-error" : ""}`} role="status" aria-live="polite">
+        {message && (messageIsError ? <CircleAlert aria-hidden="true" /> : <Check aria-hidden="true" />)}
         {message}
       </div>
       {profile && (
@@ -492,9 +508,16 @@ function AppWorkbench({ repository }: { repository: ClassRepository }) {
           gradeForm={actions.gradeForm}
           setGradeForm={actions.setGradeForm}
           saveGrade={actions.saveGrade}
+          gradeError={actions.gradeError}
+          gradeSaving={actions.gradeSaving}
           close={() => setProfile(undefined)}
           editStudent={actions.editStudent}
           deleteStudent={actions.deleteStudent}
+          moveStudent={() => {
+            actions.beginSeatMove(profile);
+            if (!desktopViewport) setToolRailOpen(false);
+          }}
+          returnToPool={() => actions.returnToPool(profile)}
         />
       )}
       {(actions.newOpen || actions.settingsOpen) && (

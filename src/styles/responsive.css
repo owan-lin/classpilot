@@ -93,6 +93,11 @@
     padding: 76px var(--mobile-gutter) 24px;
   }
 
+  .starting {
+    width: min(400px, calc(100% - 112px));
+    margin-top: 96px;
+  }
+
   .canvas-scroll > .canvas {
     margin-left: 0;
   }
@@ -123,6 +128,26 @@
   .profile dl,
   .new-class {
     grid-template-columns: 1fr;
+  }
+
+  .student-form input,
+  .student-form select,
+  .student-form textarea,
+  .new-class input,
+  .new-class select,
+  .profile-grade-card form input,
+  .grade-import textarea,
+  .roster-search input {
+    font-size: 16px;
+    line-height: 24px;
+  }
+
+  .profile-grade-card form {
+    grid-template-columns: 1fr;
+  }
+
+  .profile-grade-card form > * {
+    grid-column: 1 / -1;
   }
 
   .status {

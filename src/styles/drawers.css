@@ -12,7 +12,7 @@
     opacity: 0;
     transition:
       opacity var(--motion),
-      visibility 0s linear var(--motion);
+      visibility 0s linear var(--motion-duration);
   }
 
   .drawer-backdrop.visible {

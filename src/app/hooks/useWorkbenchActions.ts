@@ -16,7 +16,8 @@ import {
   specialDeskSpec,
   type ClassroomStage,
 } from "../../domain/layout";
-import { placeStudent } from "../../domain/seating";
+import { placeStudent, unassignStudent } from "../../domain/seating";
+import { validateGradeInput } from "../../domain/grades";
 import type {
   ClassRepository,
   DeskRecord,
@@ -67,6 +68,8 @@ type DraftSessionLike = {
   update: (fn: (current: LayoutDraft) => LayoutDraft) => void;
   flush: () => Promise<void>;
 };
+type StudentEditorContext = { classId: string; studentId?: string; token: number };
+type GradePreviewSession = { classId: string; sourceText: string; preview: ReturnType<typeof previewGradeCsv> };
 type WorkbenchActionsOptions = {
   repository: ClassRepository;
   classId?: string;
@@ -144,7 +147,7 @@ export function useWorkbenchActions({
 }: WorkbenchActionsOptions) {
   const [studentForm, setStudentForm] = useState(emptyStudent);
   const [studentError, setStudentError] = useState("");
-  const [editingStudent, setEditingStudent] = useState<string>();
+  const [editingContext, setEditingContext] = useState<StudentEditorContext>();
   const [studentSaving, setStudentSaving] = useState(false);
   const studentRequestRef = useRef<string | undefined>(undefined);
   const latestStudentFormRef = useRef(emptyStudent);
@@ -156,13 +159,32 @@ export function useWorkbenchActions({
   const [rebuildPreview, setRebuildPreview] = useState(false);
   const [gradeForm, setGradeForm] = useState(emptyGrade);
   const [gradeCsv, setGradeCsv] = useState("");
-  const [gradePreview, setGradePreview] =
-    useState<ReturnType<typeof previewGradeCsv>>();
+  const [gradePreviewSession, setGradePreviewSession] = useState<GradePreviewSession>();
+  const [gradeError, setGradeError] = useState("");
+  const [gradeSaving, setGradeSaving] = useState(false);
+  const [gradeImporting, setGradeImporting] = useState(false);
+  const studentDrafts = useRef(new Map<string, { form: typeof emptyStudent; context?: StudentEditorContext; error: string }>());
+  const editorToken = useRef(0);
 
   useEffect(() => {
     latestStudentFormRef.current = studentForm;
-    latestEditingStudentRef.current = editingStudent;
-  }, [editingStudent, studentForm]);
+    latestEditingStudentRef.current = editingContext?.studentId;
+  }, [editingContext, studentForm]);
+
+  useEffect(() => {
+    if (!classId) return;
+    if (editingContext?.classId && editingContext.classId !== classId)
+      studentDrafts.current.set(editingContext.classId, { form: studentForm, context: editingContext, error: studentError });
+    const restored = studentDrafts.current.get(classId);
+    setStudentForm(restored?.form ?? emptyStudent);
+    setEditingContext(restored?.context);
+    setStudentError(restored?.error ?? "");
+    setGradeCsv("");
+    setGradePreviewSession(undefined);
+    setGradeError("");
+    // Class identity, rather than a later save response, owns editor state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [classId]);
 
   const capacity =
     classForm.rows * classForm.desksPerRow * classForm.deskCapacity;
@@ -273,7 +295,8 @@ export function useWorkbenchActions({
     if (!studentForm.name.trim()) return setStudentError("请输入学生姓名");
     const requestClassId = classId;
     const submittedForm = { ...studentForm };
-    const submittedEditingStudent = editingStudent;
+    const submittedContext = editingContext;
+    const submittedEditingStudent = submittedContext?.studentId;
     const requestKey = JSON.stringify([
       requestClassId,
       submittedEditingStudent,
@@ -283,18 +306,22 @@ export function useWorkbenchActions({
     studentRequestRef.current = requestKey;
     setStudentSaving(true);
     try {
-      if (submittedEditingStudent)
+      if (submittedEditingStudent) {
+        const existing = await repository.getStudent(submittedEditingStudent);
+        if (!existing || existing.classId !== requestClassId || submittedContext?.classId !== requestClassId)
+          throw new Error("学生编辑会话已失效，请重新打开该学生");
         await repository.updateStudent(submittedEditingStudent, submittedForm);
-      else await repository.createStudent(studentInput(requestClassId, submittedForm));
+      } else await repository.createStudent(studentInput(requestClassId, submittedForm));
       const roster = await repository.listStudents(requestClassId);
       if (!isCurrent()) return;
       setStudents(roster);
       if (
         sameStudentForm(latestStudentFormRef.current, submittedForm) &&
-        latestEditingStudentRef.current === submittedEditingStudent
+        latestEditingStudentRef.current === submittedEditingStudent &&
+        editingContext?.token === submittedContext?.token
       ) {
         setStudentForm(emptyStudent);
-        setEditingStudent(undefined);
+        setEditingContext(undefined);
         setStudentError("");
       }
       setMessage("学生档案已保存");
@@ -302,7 +329,8 @@ export function useWorkbenchActions({
       if (
         isCurrent() &&
         sameStudentForm(latestStudentFormRef.current, submittedForm) &&
-        latestEditingStudentRef.current === submittedEditingStudent
+        latestEditingStudentRef.current === submittedEditingStudent &&
+        editingContext?.token === submittedContext?.token
       )
         setStudentError(
           error instanceof Error ? error.message : "学生保存失败",
@@ -314,7 +342,11 @@ export function useWorkbenchActions({
   }
 
   function editStudent(student: StudentRecord) {
-    setEditingStudent(student.id);
+    if (!classId || student.classId !== classId) {
+      setStudentError("该学生不属于当前班级");
+      return;
+    }
+    setEditingContext({ classId, studentId: student.id, token: ++editorToken.current });
     setStudentForm({
       name: student.name,
       studentNo: student.studentNo,
@@ -328,6 +360,29 @@ export function useWorkbenchActions({
     setProfileTab("profile");
     setGradeForm({ ...emptyGrade, studentId: student.id });
     setProfile(student);
+  }
+  function openStudentGrades(student: StudentRecord) {
+    setProfileTab("grades");
+    setGradeForm({ ...emptyGrade, studentId: student.id });
+    setProfile(student);
+  }
+  function beginSeatMove(student: StudentRecord) {
+    if (!classId || student.classId !== classId) return setMessage("该学生不属于当前班级");
+    setProfile(undefined);
+    activateTool("seating");
+    setSelectedId(student.id);
+    setMessage(`正在移动 ${student.name}，请选择目标座位`);
+  }
+  function cancelSeatMove() {
+    setSelectedId(undefined);
+    setMessage("已取消移动座位");
+  }
+  function returnToPool(student: StudentRecord) {
+    if (!classId || student.classId !== classId) return;
+    change((current) => ({ ...current, assignments: unassignStudent(current.assignments, student.id) }));
+    setProfile(undefined);
+    setSelectedId(undefined);
+    setMessage(`${student.name} 已回到待安排`);
   }
   async function deleteStudent(student: StudentRecord) {
     if (!confirm("删除这名学生？")) return;
@@ -349,6 +404,7 @@ export function useWorkbenchActions({
     if (!selectedId)
       return occupant ? openProfile(occupant) : setMessage("请选择一名学生");
     const incoming = byId.get(selectedId);
+    if (occupant?.id === selectedId) return cancelSeatMove();
     if (
       occupant &&
       incoming &&
@@ -360,7 +416,7 @@ export function useWorkbenchActions({
       assignments: placeStudent(current.assignments, selectedId, seatId),
     }));
     setSelectedId(undefined);
-    setMessage("座位已保存");
+    setMessage("座位已更新，正在保存到此设备");
   }
   function drop(event: React.DragEvent, seatId: string) {
     event.preventDefault();
@@ -380,7 +436,8 @@ export function useWorkbenchActions({
       ...current,
       assignments: placeStudent(current.assignments, studentId, seatId),
     }));
-    setMessage("座位已保存");
+    setSelectedId(undefined);
+    setMessage("座位已更新，正在保存到此设备");
   }
   function addDesk(kind: DeskRecord["kind"]) {
     if (!draft) return;
@@ -445,28 +502,23 @@ export function useWorkbenchActions({
   }
   async function saveGrade(event: FormEvent) {
     event.preventDefault();
-    if (!classId) return;
-    if (!gradeForm.score.trim() || !gradeForm.fullScore.trim()) {
-      setMessage("请填写得分和满分");
-      return;
-    }
+    if (!classId || gradeSaving) return;
     const score = Number(gradeForm.score);
     const fullScore = Number(gradeForm.fullScore);
-    if (
-      !Number.isFinite(score) ||
-      !Number.isFinite(fullScore) ||
-      score < 0 ||
-      fullScore <= 0 ||
-      score > fullScore
-    ) {
-      setMessage("得分必须在 0 到满分之间");
+    try {
+      validateGradeInput({ subject: gradeForm.subject, examName: gradeForm.examName, examDate: gradeForm.examDate, score, fullScore, ...(gradeForm.note ? { note: gradeForm.note } : {}) });
+    } catch (error) {
+      setGradeError(error instanceof Error ? error.message : "请检查成绩信息");
       return;
     }
     const requestClassId = classId;
+    const requestStudentId = gradeForm.studentId;
+    setGradeError("");
+    setGradeSaving(true);
     try {
       await repository.createGrade({
         classId: requestClassId,
-        studentId: gradeForm.studentId,
+        studentId: requestStudentId,
         subject: gradeForm.subject,
         examName: gradeForm.examName,
         examDate: gradeForm.examDate,
@@ -478,49 +530,57 @@ export function useWorkbenchActions({
       if (!isCurrent()) return;
       setGrades(scoreList);
       setGradeForm(
-        profile ? { ...emptyGrade, studentId: profile.id } : emptyGrade,
+        profile?.id === requestStudentId ? { ...emptyGrade, studentId: profile.id } : emptyGrade,
       );
       setMessage("成绩已保存");
     } catch (error) {
-      if (isCurrent())
-        setMessage(error instanceof Error ? error.message : "成绩保存失败");
+      if (isCurrent()) setGradeError(error instanceof Error ? error.message : "成绩保存失败");
+    } finally {
+      if (isCurrent()) setGradeSaving(false);
     }
   }
   async function importGrades() {
-    if (!classId || !gradePreview) return;
+    if (!classId || !gradePreviewSession || gradeImporting) return;
+    if (gradePreviewSession.classId !== classId || gradePreviewSession.sourceText !== gradeCsv) {
+      setGradeError("内容已修改，请重新预览");
+      return;
+    }
     const requestClassId = classId;
+    setGradeError("");
+    setGradeImporting(true);
     try {
       await repository.importGrades(
         requestClassId,
-        gradePreview.rows,
+        gradePreviewSession.preview.rows,
         "reject",
       );
       const scoreList = await repository.listGrades(requestClassId);
       if (!isCurrent()) return;
       setGrades(scoreList);
       setGradeCsv("");
-      setGradePreview(undefined);
+      setGradePreviewSession(undefined);
       setMessage("成绩导入完成");
     } catch (error) {
-      if (isCurrent())
-        setMessage(error instanceof Error ? error.message : "成绩导入失败");
+      if (isCurrent()) setGradeError(error instanceof Error ? error.message : "成绩导入失败");
+    } finally {
+      if (isCurrent()) setGradeImporting(false);
     }
   }
 
   function resetStudentEditor() {
-    setEditingStudent(undefined);
+    setEditingContext(undefined);
     setStudentForm(emptyStudent);
     setStudentError("");
   }
   function clearGradePreview() {
-    setGradePreview(undefined);
+    setGradePreviewSession(undefined);
   }
 
   return {
     studentForm,
     setStudentForm,
     studentError,
-    editingStudent,
+    editingStudent: editingContext?.studentId,
     studentSaving,
     classForm,
     setClassForm,
@@ -531,9 +591,23 @@ export function useWorkbenchActions({
     gradeForm,
     setGradeForm,
     gradeCsv,
-    setGradeCsv,
-    gradePreview,
-    setGradePreview,
+    setGradeCsv: (value: string) => {
+      setGradeCsv(value);
+      if (gradePreviewSession?.sourceText !== value) {
+        setGradePreviewSession(undefined);
+        setGradeError("内容已修改，请重新预览");
+      }
+    },
+    gradePreview: gradePreviewSession?.preview,
+    previewGrades: () => {
+      if (!classId) return;
+      const preview = previewGradeCsv(gradeCsv);
+      setGradePreviewSession({ classId, sourceText: gradeCsv, preview });
+      setGradeError("");
+    },
+    gradeError,
+    gradeSaving,
+    gradeImporting,
     capacity,
     createClass,
     saveSettings,
@@ -543,6 +617,10 @@ export function useWorkbenchActions({
     saveStudent,
     editStudent,
     openProfile,
+    openStudentGrades,
+    beginSeatMove,
+    cancelSeatMove,
+    returnToPool,
     deleteStudent,
     seat,
     drop,

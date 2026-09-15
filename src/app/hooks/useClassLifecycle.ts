@@ -10,6 +10,8 @@ import { regularDeskSpec } from "../../domain/layout";
 import { createDefaultDraft } from "../../features/drafts/createDraft";
 import { DraftSession } from "../../features/drafts/draftSession";
 
+export type LoadState = "loading" | "ready" | "error" | "idle";
+
 function normalizeLegacyRegularDeskGeometry(draft: LayoutDraft): LayoutDraft {
   let changed = false;
   const desks = draft.desks.map((desk) => {
@@ -38,6 +40,8 @@ export function useClassLifecycle(
   const [draft, setDraft] = useState<LayoutDraft>();
   const [grades, setGrades] = useState<GradeRecord[]>([]);
   const [loadedClassId, setLoadedClassId] = useState<string>();
+  const [classListState, setClassListState] = useState<LoadState>("loading");
+  const [currentClassState, setCurrentClassState] = useState<LoadState>("idle");
   const [selection, setSelection] = useState(classId);
   if (selection !== classId) {
     setSelection(classId);
@@ -60,9 +64,15 @@ export function useClassLifecycle(
   }, []);
 
   const reloadClasses = useCallback(async () => {
-    const items = await repository.listClasses();
-    setClasses(items);
-    return items;
+    try {
+      const items = await repository.listClasses();
+      setClasses(items);
+      setClassListState("ready");
+      return items;
+    } catch (error) {
+      setClassListState("error");
+      throw error;
+    }
   }, [repository]);
 
   useEffect(() => {
@@ -70,10 +80,10 @@ export function useClassLifecycle(
     void repository
       .listClasses()
       .then((items) => {
-        if (mounted) setClasses(items);
+        if (mounted) { setClasses(items); setClassListState("ready"); }
       })
       .catch(() => {
-        if (mounted) onError("无法读取班级列表");
+        if (mounted) { setClassListState("error"); onError("无法读取班级列表"); }
       });
     return () => {
       mounted = false;
@@ -86,6 +96,7 @@ export function useClassLifecycle(
     const pending = pendingSessions.current;
     let unsubscribe = () => {};
     let unsubscribeError = () => {};
+    if (!classId) return;
     void (async () => {
       await flushPending();
       if (!classId || !mounted) return;
@@ -119,9 +130,12 @@ export function useClassLifecycle(
       setGrades(scores);
       setDraft(next);
       setLoadedClassId(classId);
+      setCurrentClassState("ready");
     })().catch((error: unknown) => {
-      if (mounted)
+      if (mounted) {
+        setCurrentClassState("error");
         onError(error instanceof Error ? error.message : "无法读取班级数据");
+      }
     });
     return () => {
       mounted = false;
@@ -152,5 +166,7 @@ export function useClassLifecycle(
     setGrades,
     sessionRef,
     reloadClasses,
+    classListState,
+    currentClassState: !classId ? "idle" : loadedClassId === classId ? currentClassState : currentClassState === "error" ? "error" : "loading",
   };
 }

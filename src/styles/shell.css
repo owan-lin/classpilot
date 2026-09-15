@@ -76,7 +76,7 @@
   transition:
     opacity var(--motion),
     transform var(--motion),
-    visibility 0s linear var(--motion);
+    visibility 0s linear var(--motion-duration);
 }
 
 .rail-panel {
@@ -159,7 +159,7 @@
   transition:
     opacity var(--motion),
     transform var(--motion),
-    visibility 0s linear var(--motion);
+    visibility 0s linear var(--motion-duration);
 }
 
 .tool-rail nav .tab {

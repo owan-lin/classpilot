@@ -1,7 +1,6 @@
-import type { FormEvent } from "react";
-import { RotateCcw, UserPlus, Users } from "lucide-react";
+import { useMemo, useState, type FormEvent } from "react";
+import { RotateCcw, Search, UserPlus, Users } from "lucide-react";
 import { GradeTools } from "../../features/grades/GradeTools";
-import { previewGradeCsv } from "../../features/grades/gradeImport";
 import {
   studentGenderAttributes,
   studentGenderLabel,
@@ -26,12 +25,14 @@ export function SeatingPanel({
   pool,
   selectedId,
   setSelectedId,
+  cancelMove,
   openProfile,
 }: {
   students: StudentRecord[];
   pool: StudentRecord[];
   selectedId?: string;
   setSelectedId: (id?: string) => void;
+  cancelMove: () => void;
   openProfile: (student: StudentRecord) => void;
 }) {
   return (
@@ -41,6 +42,7 @@ export function SeatingPanel({
           <Users aria-hidden="true" />
           待安排学生 <span>{pool.length}</span>
         </h2>
+        {selectedId && <div className="move-task" role="status"><span>正在移动学生，请选择目标座位。</span><button type="button" className="quiet" onClick={cancelMove}>取消</button></div>}
         {pool.length ? (
           <ul>
             {pool.map((student) => (
@@ -156,6 +158,7 @@ export function StudentPanel({
   studentSaving,
   openProfile,
   editStudent,
+  cancelEdit,
 }: {
   students: StudentRecord[];
   form: StudentForm;
@@ -166,7 +169,13 @@ export function StudentPanel({
   studentSaving?: boolean;
   openProfile: (student: StudentRecord) => void;
   editStudent: (student: StudentRecord) => void;
+  cancelEdit: () => void;
 }) {
+  const [query, setQuery] = useState("");
+  const visibleStudents = useMemo(() => {
+    const normalized = query.trim().toLocaleLowerCase("zh-CN");
+    return normalized ? students.filter((student) => `${student.name} ${student.studentNo}`.toLocaleLowerCase("zh-CN").includes(normalized)) : students;
+  }, [query, students]);
   return (
     <section className="student-workspace">
       <form className="student-form" aria-busy={studentSaving || undefined} noValidate onSubmit={saveStudent}>
@@ -221,14 +230,21 @@ export function StudentPanel({
             <UserPlus aria-hidden="true" />
             {editingStudent ? "保存修改" : "保存并继续"}
           </button>
+          {editingStudent && <button type="button" className="quiet" onClick={cancelEdit}>取消编辑</button>}
         </div>
       </form>
       <section className="roster">
         <h2>
-          学生档案 <span>{students.length}</span>
+          学生档案 <span>{visibleStudents.length}/{students.length}</span>
         </h2>
+        <label className="roster-search">
+          <Search aria-hidden="true" />
+          <span className="sr-only">搜索学生</span>
+          <input aria-label="搜索学生" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索姓名或学号" />
+          {query && <button type="button" className="icon" onClick={() => setQuery("")}>清除</button>}
+        </label>
         <ul>
-          {students.map((student) => (
+          {visibleStudents.map((student) => (
             <li key={student.id}>
               <button type="button" onClick={() => openProfile(student)}>
                 <b>{student.name}</b>
@@ -247,6 +263,7 @@ export function StudentPanel({
             </li>
           ))}
         </ul>
+        {!visibleStudents.length && <p className="empty-line">没有匹配的学生。</p>}
       </section>
     </section>
   );
@@ -258,18 +275,22 @@ export function GradesPanel({
   gradeCsv,
   gradePreview,
   setGradeCsv,
-  setGradePreview,
+  previewGrades,
   importGrades,
-  openProfile,
+  error,
+  importing,
+  openStudentGrades,
 }: {
   students: StudentRecord[];
   grades: GradeRecord[];
   gradeCsv: string;
   gradePreview?: GradeImportPreview;
   setGradeCsv: (value: string) => void;
-  setGradePreview: (value: GradeImportPreview | undefined) => void;
+  previewGrades: () => void;
   importGrades: () => void;
-  openProfile: (student: StudentRecord) => void;
+  error: string;
+  importing: boolean;
+  openStudentGrades: (student: StudentRecord) => void;
 }) {
   return (
     <section className="student-workspace">
@@ -280,7 +301,7 @@ export function GradesPanel({
         <ul>
           {students.map((student) => (
             <li key={student.id}>
-              <button type="button" onClick={() => openProfile(student)}>
+              <button type="button" onClick={() => openStudentGrades(student)}>
                 <b>{student.name}</b>
                 <span>
                   {
@@ -298,8 +319,10 @@ export function GradesPanel({
         csv={gradeCsv}
         preview={gradePreview}
         onCsv={setGradeCsv}
-        onPreview={() => setGradePreview(previewGradeCsv(gradeCsv))}
+        onPreview={previewGrades}
         onImport={importGrades}
+        error={error}
+        importing={importing}
         grades={grades}
         students={students}
       />

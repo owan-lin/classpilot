@@ -11,13 +11,19 @@
   padding: 0 14px;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
-  font-weight: 750;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+  white-space: nowrap;
 }
 
 .primary {
   color: var(--surface);
   background: var(--brand);
 }
+
+.primary:hover { background: #155f90; }
+.quiet:hover { background: var(--brand-soft); }
 
 .quiet {
   color: var(--ink-action);
@@ -26,9 +32,12 @@
 }
 
 .danger {
-  color: var(--surface);
-  background: var(--danger);
+  color: var(--danger);
+  background: transparent;
+  border-color: #e3b7b3;
 }
+
+.danger:hover { color: var(--surface); background: var(--danger); }
 
 .mode-strip {
   margin: 0 0 16px;
@@ -127,6 +136,41 @@
   list-style: none;
 }
 
+.roster-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  margin: 0 0 12px;
+  padding: 0 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+}
+
+.roster-search svg { width: 18px; color: var(--muted); }
+.roster-search input { min-width: 0; flex: 1; border: 0; outline: 0; background: transparent; }
+
+.roster li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  border-top: 1px solid var(--line);
+}
+
+.roster li > button:first-child {
+  min-width: 0;
+  padding: 10px 0;
+  color: var(--ink);
+  text-align: left;
+  background: transparent;
+  border: 0;
+}
+
+.roster li > button:first-child b,
+.roster li > button:first-child span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.roster li > button:first-child span { margin-top: 2px; color: var(--muted); font-size: 12px; }
+
 .pool li {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -177,6 +221,26 @@
   color: var(--ink);
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 20px;
+}
+
+.student-form input::placeholder,
+.student-form textarea::placeholder,
+.grade-import textarea::placeholder { color: var(--muted); font-weight: 400; }
+
+.form-error {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  color: #8a2722;
+  background: #fff4f3;
+  border: 1px solid #e5b7b2;
+  border-left: 3px solid var(--danger);
+  border-radius: var(--radius-xs);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 20px;
 }
 
 .student-form textarea {
@@ -258,6 +322,19 @@
   margin: 6px 0 0;
 }
 
+.grade-preview:has(p) { color: var(--ink); }
+.grade-preview p { overflow-wrap: anywhere; }
+
+.grade-table-scroll { overflow-x: auto; margin-top: 8px; border: 1px solid var(--line); border-radius: var(--radius-sm); }
+.grade-table { width: 100%; min-width: 540px; border-collapse: collapse; font-size: 13px; }
+.grade-table th, .grade-table td { padding: 9px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+.grade-table th { color: var(--muted); background: var(--surface-muted); font-size: 12px; font-weight: 600; white-space: nowrap; }
+.grade-table tr:last-child td { border-bottom: 0; }
+.grade-table td:nth-child(1) { min-width: 84px; font-weight: 600; }
+.grade-table td:nth-child(3) { min-width: 120px; overflow-wrap: anywhere; }
+.grade-table td:nth-child(4), .grade-table td:nth-child(5) { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.grade-table th:last-child, .grade-table td:last-child { text-align: right; }
+
 /* Modal contract: one scrim, then a scrollable foreground surface. */
 .overlay {
   position: fixed;
@@ -281,6 +358,8 @@
   border-radius: var(--radius-md);
   box-shadow: var(--shadow);
 }
+
+.profile { width: min(540px, 100%); }
 
 .profile h2,
 .new-class h2 {
@@ -325,28 +404,16 @@
   box-shadow: var(--shadow-tab);
 }
 
-.profile dl {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-
-.profile dl div {
-  padding: 10px;
-  background: var(--surface-muted);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-}
+.profile dl { display: grid; grid-template-columns: 88px minmax(0, 1fr); gap: 8px 16px; margin: 0; }
+.profile dl div { display: contents; }
 
 .profile dt {
   color: var(--muted);
   font-size: 12px;
 }
 
-.profile dd {
-  margin: 4px 0 0;
-  font-weight: 700;
-}
+.profile dd { margin: 0; font-weight: 500; }
+.profile [role="tabpanel"] > p { margin: 16px 0 0; color: var(--muted); overflow-wrap: anywhere; }
 
 .profile-grade-card {
   padding-top: 4px;
@@ -364,11 +431,17 @@
 
 .profile-grade-card form {
   display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 12px;
   margin-top: 20px;
   padding-top: 16px;
   border-top: 1px solid var(--line);
 }
+
+.profile-grade-card form h3,
+.profile-grade-card form .form-error,
+.profile-grade-card form label:nth-of-type(3),
+.profile-grade-card form .primary { grid-column: 1 / -1; }
 
 .profile-grade-card form .primary {
   margin-top: 8px;
@@ -388,7 +461,7 @@
   grid-column: 1 / -1;
 }
 
-.new-class > p {
+.new-class > p:not(.form-error) {
   margin: 16px 0 0;
   padding: 10px 12px;
   color: var(--muted);
@@ -415,6 +488,38 @@
   box-shadow: var(--shadow);
   transform: translateX(-50%);
 }
+
+.status-error {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.status svg {
+  width: 16px;
+  height: 16px;
+  vertical-align: -3px;
+  margin-right: 6px;
+}
+
+.move-task {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 8px;
+  color: var(--ink);
+  background: var(--brand-soft);
+  border-left: 3px solid var(--brand);
+}
+
+.move-task .quiet {
+  min-height: 36px;
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+
+.move-task { align-items: flex-start; }
+.move-task > span { min-width: 0; flex: 1; line-height: 20px; }
 
 /* Keep feedback inside the canvas band, opposite the zoom controls. */
 @media (min-width: 1025px) {
